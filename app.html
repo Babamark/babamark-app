@@ -2405,7 +2405,7 @@ function renderProd(){
       ${can('export')?`<button class="btn sm gray" onclick="exportProdCsv(${p.id})">⬇ אקסל</button>`:''}
       ${ed?`<button class="btn sm gray" onclick="prodImportModal(${p.id},'actuals')">⬆ ייבוא מאקסל</button>`:''}
       ${ed?`<label class="btn sm gray" style="cursor:pointer;margin:0">📷 קבלה<input type="file" accept="image/*,.pdf" capture="environment" style="display:none" onchange="receiptUpload(${p.id},this.files[0]);this.value=''"></label>`:''}
-      ${acAll.some(a=>a.receipt_url)?`<button class="btn sm gray" title="מוריד את הקבלות של השורות המסומנות (עמודה ראשונה) כקובץ ZIP" onclick="receiptsZip(${p.id},'sel')">⬇ ZIP מסומנות</button><button class="btn sm gray" title="מוריד את כל הקבלות המוצגות (אחרי סינון) כקובץ ZIP" onclick="receiptsZip(${p.id},'all')">⬇ ZIP הכל</button>`:''}
+      ${acAll.some(a=>actReceipts(a).length)?`<button class="btn sm gray" title="מוריד את הקבלות של השורות המסומנות (עמודה ראשונה) כקובץ ZIP" onclick="receiptsZip(${p.id},'sel')">⬇ ZIP מסומנות</button><button class="btn sm gray" title="מוריד את כל הקבלות המוצגות (אחרי סינון) כקובץ ZIP" onclick="receiptsZip(${p.id},'all')">⬇ ZIP הכל</button>`:''}
       ${ed?`<button class="btn sm" onclick="quickExpense(${p.id},PRODF.line||'')">+ הוצאה</button>`:''}
       </span>
     </div>
@@ -2426,7 +2426,7 @@ function renderProd(){
     </tr></thead><tbody>
     ${acAll.map((a,i)=>({a,i})).filter(({a})=>match(a)).map(({a,i})=>{const chg=(a.charge!=null&&a.charge!==''?+a.charge:(+a.amount||0));const mg=chg-(+a.amount||0);
       return `<tr>
-      <td><input type="checkbox" class="rcv_ck" data-i="${i}" title="${a.receipt_url?'סמן להורדה ב-ZIP':'אין קבלה מצורפת'}"></td>
+      <td><input type="checkbox" class="rcv_ck" data-i="${i}" title="${actReceipts(a).length?'סמן להורדה ב-ZIP':'אין קבלה מצורפת'}"></td>
       <td><input class="cell wide" style="width:120px" ${dis} value="${esc(a.desc)}" onchange="paSet(${p.id},${i},'desc',this.value)"></td>
       <td><input class="cell wide" style="width:85px" ${dis} value="${esc(a.supplier||'')}" onchange="paSet(${p.id},${i},'supplier',this.value)"></td>
       <td><input class="cell wide" style="width:95px" list="paCats${p.id}" ${dis} value="${esc(a.cat||'')}" placeholder="—" onchange="paSet(${p.id},${i},'cat',this.value.trim())"></td>
@@ -2438,7 +2438,7 @@ function renderProd(){
       <td>${payerSelect(a.paid_by||'',`paSet(${p.id},${i},'paid_by',this.value)`,dis)}</td>
       <td><select class="cell" ${dis} onchange="paSet(${p.id},${i},'inv',this.value)">${INV2.map(x=>`<option value="${x}" ${actNorm(a).inv===x?'selected':''}>${x||'—'}</option>`).join('')}</select></td>
       <td><select class="cell" ${dis} onchange="paSet(${p.id},${i},'pay',this.value)">${PAY2.map(x=>`<option value="${x}" ${actNorm(a).pay===x?'selected':''}>${x||'—'}</option>`).join('')}</select></td>
-      <td style="white-space:nowrap">${a.receipt_url?`<a href="${esc(a.receipt_url)}" target="_blank" title="פתח קבלה">📎</a>`:''}${ed?`<label style="cursor:pointer;margin-right:4px" title="${a.receipt_url?'החלף קובץ':'העלה קובץ / תמונה של הקבלה'}">${a.receipt_url?'<span class="mut" style="font-size:11px">⇪</span>':'<span style="color:var(--sky);font-weight:700">⇪</span>'}<input type="file" accept="image/*,.pdf" style="display:none" onchange="receiptAttach(${p.id},${i},this.files[0]);this.value=''"></label>${a.receipt_url?'':`<span class="mut" style="cursor:pointer;font-size:11px;margin-right:4px" title="או: הדבק קישור לקבלה" onclick="const u=prompt('קישור לקבלה / חשבונית:');if(u!=null)paSet(${p.id},${i},'receipt_url',u.trim())">🔗</span>`}`:''}</td>
+      <td style="white-space:nowrap">${(()=>{const rs=actReceipts(a);return `${rs.length?`<a href="${esc(rs[0].url)}" target="_blank" title="פתח קבלה">📎</a>${rs.length>1?`<span style="cursor:pointer;font-size:11px;font-weight:700;color:var(--sky)" title="כל הקבלות" onclick="receiptsPopover(${p.id},${i})">×${rs.length}</span>`:''}${(()=>{if(!receiptsHaveAmt(a))return '';const d=receiptsSum(a)-Math.round((+a.amount||0)*(1+k.vrate));return Math.abs(d)<=1?`<span class="pos" style="font-size:11px" title="סך הקבלות תואם לשורה">✓</span>`:`<span class="${d<0?'negv':'negv'}" style="font-size:10.5px;cursor:pointer" title="סך הקבלות ${NIS(receiptsSum(a))} מול השורה — לחץ לפרטים" onclick="receiptsPopover(${p.id},${i})">${d<0?'חסר '+NIS(-d):'+'+NIS(d)}</span>`;})()}`:''}${ed?`<label style="cursor:pointer;margin-right:4px" title="${rs.length?'הוסף עוד קובץ':'העלה קובץ / תמונה של הקבלה'}"><span style="color:var(--sky);font-weight:700">⇪</span><input type="file" accept="image/*,.pdf" multiple style="display:none" onchange="receiptAttach(${p.id},${i},this.files);this.value=''"></label><span class="mut" style="cursor:pointer;font-size:11px;margin-right:4px" title="${rs.length?'ניהול קבלות / קישור':'הדבק קישור לקבלה'}" onclick="receiptsPopover(${p.id},${i})">${rs.length?'⋯':'🔗'}</span>`:''}`;})()}</td>
       <td>${ed?`<button class="xbtn" onclick="paDel(${p.id},${i})">×</button>`:''}</td></tr>`;}).join('')}
     ${(()=>{const shown=acAll.filter(match);const ex=shown.reduce((a,x)=>a+(+x.amount||0),0);const chg=shown.reduce((a,x)=>a+((x.charge!=null&&x.charge!=='')?+x.charge:(+x.amount||0)),0);
       const byPayer={};shown.forEach(x=>{const w=x.paid_by||'לא צוין';byPayer[w]=(byPayer[w]||0)+(+x.amount||0);});
@@ -2992,12 +2992,65 @@ async function receiptStore(p,file){
   if(error)throw error;
   const {data}=sb.storage.from('receipts').getPublicUrl(path);return data?.publicUrl||'';
 }
+/* קריאת סכום מקבלה (OCR) — מחזיר null אם לא זמין */
+async function receiptOcr(p,file){
+  try{let b64=null;
+    if(/^image\//.test(file.type))b64=await shrinkImage(file,1600);
+    else if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){if(file.size>8*1024*1024)return null;
+      b64={type:'application/pdf',data:await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(file);})};}
+    if(!b64)return null;
+    const {data,error}=await sb.functions.invoke('receipt-ocr',{body:{image_base64:b64.data,media_type:b64.type,hint_lines:[]}});
+    if(error||!data?.success)return null;return data;
+  }catch(e){return null;}
+}
+/* נרמול: מעביר receipt_url ישן לתוך receipts[] כדי שיהיה לו סכום */
+function receiptsNormalize(x){x.receipts=x.receipts||[];if(x.receipt_url){if(!x.receipts.some(r=>r.url===x.receipt_url))x.receipts.unshift({url:x.receipt_url,name:''});delete x.receipt_url;}return x.receipts;}
+const receiptsSum=a=>actReceipts(a).reduce((t,r)=>t+(+r.amount||0),0);
+const receiptsHaveAmt=a=>actReceipts(a).some(r=>r.amount!=null&&r.amount!=='');
+async function receiptSetAmount(pid,i,url,val){
+  const p=prodn(pid);const a=structuredClone(p.actuals||[]);const x=a[i];if(!x)return;
+  const rs=receiptsNormalize(x);const r=rs.find(r=>r.url===url);if(!r)return;
+  const t=String(val).replace(/[^\d.-]/g,'');r.amount=t===''?null:+t;
+  await upd('productions',pid,{actuals:a});renderProd();receiptsPopover(pid,i);
+}
+/* כל הקבלות של שורת הוצאה: receipt_url הישן + מערך receipts */
+const actReceipts=a=>{const r=[];if(a.receipt_url)r.push({url:a.receipt_url,name:''});(a.receipts||[]).forEach(x=>{if(x&&x.url&&!r.some(y=>y.url===x.url))r.push(x);});return r;};
+async function receiptRemove(pid,i,url){
+  const p=prodn(pid);const a=structuredClone(p.actuals||[]);const x=a[i];if(!x)return;
+  if(x.receipt_url===url)delete x.receipt_url;x.receipts=(x.receipts||[]).filter(r=>r.url!==url);
+  await upd('productions',pid,{actuals:a});renderProd();
+}
+function receiptsPopover(pid,i){
+  const p=prodn(pid);const a=(p.actuals||[])[i];if(!a)return;const ed=canEdit();const rs=actReceipts(a);const k=prodCalc(p);
+  const rowInc=Math.round((+a.amount||0)*(1+k.vrate));const sum=receiptsSum(a);const diff=sum-rowInc;
+  modal(`<h3>קבלות · ${esc(a.desc||'')} <span class="mut" style="font-size:12px">${esc(a.supplier||'')}</span></h3>
+  <p class="mut" style="margin:0 0 8px">השורה: <b>${NIS(+a.amount||0)}</b> לפני מע״מ · <b>${NIS(rowInc)}</b> כולל. הזן לכל קבלה את הסכום שמופיע בה (כולל מע״מ) — והמערכת תראה אם חסר או יש חריגה.</p>
+  ${rs.length?`<div>${rs.map((r,j)=>`<div class="row" style="justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
+    <a href="${esc(r.url)}" target="_blank" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">📎 ${esc(r.name||('קבלה '+(j+1)))}${r.date?` <span class="mut" style="font-size:11px">${esc(r.date)}</span>`:''}</a>
+    <input class="cell" dir="ltr" style="width:95px" ${ed?'':'disabled'} placeholder="סכום כולל" value="${r.amount!=null&&r.amount!==''?Math.round(+r.amount):''}" onchange="receiptSetAmount(${pid},${i},'${esc(r.url)}',this.value)">
+    ${ed?`<span class="xbtn" onclick="receiptRemove(${pid},${i},'${esc(r.url)}')">×</span>`:''}</div>`).join('')}
+    <div class="row" style="justify-content:space-between;padding:8px 0;font-weight:700">
+      <span>סה״כ בקבלות: ${NIS(sum)} ${receiptsHaveAmt(a)?'':'<span class="mut" style="font-weight:400">(לא הוזנו סכומים)</span>'}</span>
+      ${receiptsHaveAmt(a)?`<span class="${Math.abs(diff)<=1?'pos':diff<0?'negv':'negv'}">${Math.abs(diff)<=1?'✓ תואם לשורה':diff<0?'חסר '+NIS(-diff):'חריגה +'+NIS(diff)}</span>`:''}
+    </div></div>`:'<p class="mut">אין קבלות מצורפות</p>'}
+  ${ed?`<div class="row" style="gap:8px;margin-top:10px"><label class="btn sm" style="cursor:pointer;margin:0">⇪ הוסף קובץ/תמונה<input type="file" accept="image/*,.pdf" multiple style="display:none" onchange="receiptAttach(${pid},${i},this.files);this.value=''"></label><button class="btn sm gray" onclick="const u=prompt('קישור לקבלה:');if(u&&u.trim())receiptAddUrl(${pid},${i},u.trim())">🔗 קישור</button>${receiptsHaveAmt(a)&&Math.abs(diff)>1&&sum>0?`<button class="btn sm gray" title="מעדכן את סכום השורה לפי סך הקבלות (${NIS(sum)} כולל מע״מ)" onclick="paSetInc(${pid},${i},${sum});closeModal()">↺ עדכן שורה לפי הקבלות</button>`:''}</div>`:''}`);
+}
+async function receiptAddUrl(pid,i,url,name){
+  const p=prodn(pid);const a=structuredClone(p.actuals||[]);const x=a[i];if(!x)return;
+  x.receipts=x.receipts||[];if(!x.receipt_url&&!x.receipts.length)x.receipt_url=url;else x.receipts.push({url,name:name||''});
+  await upd('productions',pid,{actuals:a});renderProd();
+}
 /* צירוף קבלה לשורת הוצאה קיימת — בלי OCR, רק שמירה וקישור */
-async function receiptAttach(pid,i,file){
-  const p=prodn(pid);if(!p||!file)return;
-  toast('מעלה קבלה…');
-  try{const url=await receiptStore(p,file);await paSet(pid,i,'receipt_url',url);toast('הקבלה צורפה ✓');}
-  catch(e){console.warn(e);toast('ההעלאה נכשלה: '+(e.message||e)+' — בדוק הרשאות אחסון',6000);}
+async function receiptAttach(pid,i,files){
+  const p=prodn(pid);if(!p)return;const list=files instanceof FileList||Array.isArray(files)?[...files]:[files];if(!list.length||!list[0])return;
+  toast('מעלה '+(list.length>1?list.length+' קבלות…':'קבלה…'));
+  let n=0;
+  for(const f of list){try{const url=await receiptStore(p,f);const o=await receiptOcr(p,f);
+    const a=structuredClone(prodn(pid).actuals||[]);const x=a[i];if(!x)return;
+    receiptsNormalize(x).push({url,name:f.name,amount:o?.total!=null?+o.total:null,supplier:o?.supplier||'',date:o?.date||''});
+    await upd('productions',pid,{actuals:a});n++;}
+    catch(e){console.warn(e);toast('ההעלאה נכשלה: '+(e.message||e)+' — בדוק הרשאות אחסון',6000);}}
+  if(n){renderProd();toast(n>1?n+' קבלות צורפו ✓':'הקבלה צורפה ✓');if(document.querySelector('.modal.show, #modal.show'))receiptsPopover(pid,i);}
 }
 /* הורדת קבלות כ-ZIP: mode 'sel' = מסומנות · 'all' = כל המוצגות (אחרי סינון) */
 async function receiptsZip(pid,mode){
@@ -3005,21 +3058,21 @@ async function receiptsZip(pid,mode){
   const all=(p.actuals||[]);let idx;
   if(mode==='sel'){idx=[...document.querySelectorAll('.rcv_ck:checked')].map(c=>+c.dataset.i);if(!idx.length){toast('סמן שורות קודם (עמודה ראשונה)');return;}}
   else{idx=[...document.querySelectorAll('.rcv_ck')].map(c=>+c.dataset.i);}
-  const rows=idx.map(i=>({i,a:all[i]})).filter(x=>x.a&&x.a.receipt_url);
+  const rows=[];idx.forEach(i=>{const a=all[i];if(!a)return;actReceipts(a).forEach((r,j)=>rows.push({i,a,url:r.url,j,cnt:actReceipts(a).length}));});
   if(!rows.length){toast('אין קבלות מצורפות בשורות שנבחרו');return;}
   if(!window.JSZip){toast('טוען…');await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';s.onload=res;s.onerror=()=>rej(new Error('JSZip'));document.head.appendChild(s);}).catch(()=>{toast('לא הצלחתי לטעון את רכיב ה-ZIP');});if(!window.JSZip)return;}
   toast('אורז '+rows.length+' קבלות…',8000);
   const zip=new JSZip();const safe=s=>String(s||'').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,40);
-  const index=[['#','תאריך','ספק','תיאור','סכום לפני מע״מ','מי שילם','קובץ','קישור']];let ok=0,fail=[];
-  for(let n=0;n<rows.length;n++){const {i,a}=rows[n];
-    let name=`${String(n+1).padStart(2,'0')}_${safe(a.supplier)||'ספק'}_${safe(a.desc)||'הוצאה'}_${Math.round(+a.amount||0)}`;
-    try{const r=await fetch(a.receipt_url);if(!r.ok)throw new Error(r.status);const b=await r.blob();
-      let ext=(a.receipt_url.split('?')[0].match(/\.(pdf|jpe?g|png|heic|webp|gif)$/i)||[])[1]||({'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[b.type]||'bin');
-      zip.file(name+'.'+ext.toLowerCase(),b);ok++;index.push([n+1,a.date||'',a.supplier||'',a.desc||'',Math.round(+a.amount||0),a.paid_by||'',name+'.'+ext,a.receipt_url]);}
-    catch(e){fail.push(a);index.push([n+1,a.date||'',a.supplier||'',a.desc||'',Math.round(+a.amount||0),a.paid_by||'','— לא ירד (קישור חיצוני)',a.receipt_url]);}
+  const index=[['#','תאריך','ספק','תיאור','סכום לפני מע״מ','מי שילם','קובץ','קישור']];let ok=0,fail=[];let n=0;const seenRow=new Set();
+  for(const {i,a,url,j,cnt} of rows){if(!seenRow.has(i)){seenRow.add(i);n++;}
+    let name=`${String(n).padStart(2,'0')}_${safe(a.supplier)||'ספק'}_${safe(a.desc)||'הוצאה'}_${Math.round(+a.amount||0)}${cnt>1?'_'+String.fromCharCode(97+j):''}`;
+    try{const r=await fetch(url);if(!r.ok)throw new Error(r.status);const b=await r.blob();
+      let ext=(url.split('?')[0].match(/\.(pdf|jpe?g|png|heic|webp|gif)$/i)||[])[1]||({'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[b.type]||'bin');
+      zip.file(name+'.'+ext.toLowerCase(),b);ok++;index.push([n,a.date||'',a.supplier||'',a.desc||'',Math.round(+a.amount||0),a.paid_by||'',name+'.'+ext,url]);}
+    catch(e){fail.push({a,url});index.push([n,a.date||'',a.supplier||'',a.desc||'',Math.round(+a.amount||0),a.paid_by||'','— לא ירד (קישור חיצוני)',url]);}
   }
-  zip.file('רשימה.csv','﻿'+index.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n'));
-  if(fail.length)zip.file('קישורים_חיצוניים.txt',fail.map(a=>`${a.supplier||''} · ${a.desc||''} · ${a.receipt_url}`).join('\n'));
+  zip.file('רשימה.csv','\ufeff'+index.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n'));
+  if(fail.length)zip.file('קישורים_חיצוניים.txt',fail.map(({a,url})=>`${a.supplier||''} · ${a.desc||''} · ${url}`).join('\n'));
   const blob=await zip.generateAsync({type:'blob'});
   const u=URL.createObjectURL(blob);const link=document.createElement('a');link.href=u;link.download=`קבלות_${safe(p.name)}_${new Date().toISOString().slice(0,10)}.zip`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);
   toast(`ירדו ${ok} קבלות`+(fail.length?` · ${fail.length} קישורים חיצוניים לא ירדו (רשומים בקובץ בתוך ה-ZIP)`:''),7000);
