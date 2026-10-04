@@ -3044,13 +3044,13 @@ async function receiptAddUrl(pid,i,url,name){
 async function receiptAttach(pid,i,files){
   const p=prodn(pid);if(!p)return;const list=files instanceof FileList||Array.isArray(files)?[...files]:[files];if(!list.length||!list[0])return;
   toast('מעלה '+(list.length>1?list.length+' קבלות…':'קבלה…'));
-  let n=0;
-  for(const f of list){try{const url=await receiptStore(p,f);const o=await receiptOcr(p,f);
+  let n=0,read=0;
+  for(const f of list){try{const url=await receiptStore(p,f);const o=await receiptOcr(p,f);if(o?.total!=null)read++;
     const a=structuredClone(prodn(pid).actuals||[]);const x=a[i];if(!x)return;
     receiptsNormalize(x).push({url,name:f.name,amount:o?.total!=null?+o.total:null,supplier:o?.supplier||'',date:o?.date||''});
     await upd('productions',pid,{actuals:a});n++;}
     catch(e){console.warn(e);toast('ההעלאה נכשלה: '+(e.message||e)+' — בדוק הרשאות אחסון',6000);}}
-  if(n){renderProd();toast(n>1?n+' קבלות צורפו ✓':'הקבלה צורפה ✓');if(document.querySelector('.modal.show, #modal.show'))receiptsPopover(pid,i);}
+  if(n){renderProd();toast((n>1?n+' קבלות צורפו ✓':'הקבלה צורפה ✓')+(read<n?' · '+(n-read)+' בלי סכום (לא נקרא — הזן ידנית ב-⋯)':' · הסכומים נקראו'),4500);if(document.querySelector('.modal.show, #modal.show'))receiptsPopover(pid,i);}
 }
 /* הורדת קבלות כ-ZIP: mode 'sel' = מסומנות · 'all' = כל המוצגות (אחרי סינון) */
 async function receiptsZip(pid,mode){
@@ -3109,7 +3109,7 @@ async function receiptUpload(id,file){
     $('qeInv').value=ocr.doc_type==='חשבונית מס'||ocr.doc_type==='חשבונית מס/קבלה'?'יש':$('qeInv').value;
     if(ocr.doc_type&&/קבלה/.test(ocr.doc_type))$('qePay').value='שולם';
   }
-  if(url)$('qeUrl').value=url;
+  if(url){$('qeUrl').value=url;$('qeUrl').dataset.ocrTotal=ocr?.total!=null?String(ocr.total):'';$('qeUrl').dataset.ocrName=file.name||'';}
   const h=document.querySelector('#modalHost .modal h3');
   if(h)h.insertAdjacentHTML('afterend',`<div style="background:${ocr?'#eef9f0':'#fff7e6'};border-radius:12px;padding:8px 12px;margin-bottom:8px;font-size:12.5px">
     ${ocr?`📷 נקרא מהקבלה: <b>${esc(ocr.supplier||'')}</b> · ${ocr.total!=null?NIS(ocr.total)+' ₪ כולל מע״מ':''} ${ocr.date?'· '+esc(ocr.date):''}${ocr.confidence&&ocr.confidence<0.7?' · <span style="color:var(--amber)">בדוק את הסכום</span>':''}<br><b>למה לשייך את ההוצאה?</b> ${lineId?'הצעה: '+esc(lineLabel(lineOf(p,lineId)))+' — אפשר לשנות למעלה':'בחר סעיף למעלה'}`:'📷 '+esc(err)}
@@ -3129,7 +3129,8 @@ async function quickExpenseSave(id,again){
   if($('qeInc').value==='inc')amt=Math.round(amt/(1+k.vrate)*100)/100;
   const [lineId,subId]=String($('qeLine').value||'').split('|');const l=lineOf(p,lineId);const sb_=subId&&(l?.subs||[]).find(x=>x.id===subId);
   const a={sub_id:subId||undefined,desc:$('qeDesc').value.trim()||sb_?.desc||l?.desc||'הוצאה',supplier:$('qeSup').value.trim(),cat:$('qeCat').value.trim()||l?.cat||'',amount:amt,who:ME?.name||'',
-    inv:$('qeInv').value,pay:$('qePay').value,note:$('qeNote').value.trim(),date:$('qeDate').value,receipt_url:$('qeUrl').value.trim(),line_id:lineId,paid_by:$('qePaidBy')?.value||''};
+    inv:$('qeInv').value,pay:$('qePay').value,note:$('qeNote').value.trim(),date:$('qeDate').value,line_id:lineId,paid_by:$('qePaidBy')?.value||''};
+  const qu=$('qeUrl').value.trim();if(qu){const qt=+($('qeUrl').dataset.ocrTotal||'');a.receipts=[{url:qu,name:$('qeUrl').dataset.ocrName||'',amount:qt>0?qt:null,date:$('qeDate').value||''}];}
   if(!await upd('productions',id,{actuals:[...(p.actuals||[]),a]}))return;
   toast('נשמר · '+NIS(amt)+' לפני מע״מ');
   if(again)quickExpense(id,lineId);else{closeModal();renderProd();}
