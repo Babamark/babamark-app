@@ -3186,7 +3186,10 @@ function prodStatus(p){
   const idle=L.filter(x=>x.st==='idle');
   const idleSum=idle.reduce((s,x)=>s+x.budget,0);
   /* צפי סיום: כל סעיף — הגבוה מבין תקציב/בפועל (מניחים שסעיפים שלא נוצלו עוד ינוצלו) + הוצאות לא משויכות */
-  const projected=L.reduce((s,x)=>s+Math.max(x.budget,x.actual),0)+unallocSum;
+  /* v7.5: הוצאה לא משויכת נחשבת כמי שנוגסת ביתרת התחזית — לא נוספת מעליה (אחרת נספרת פעמיים) */
+  const unallocCost=unalloc.reduce((s,a)=>s+costOf(a),0);
+  const remFc=L.reduce((s,x)=>s+Math.max(0,x.budget-x.actual),0);
+  const projected=k.actual+Math.max(0,remFc-unallocCost);
   const committed=k.actual;                      /* מה שכבר יצא */
   const projFee=projected*((+p.fee_pct||0)/100);
   const billing=k.billing;                       /* מה שהלקוח משלם: חשבונית סופית / מחיר מאושר + חריגות / PO */
@@ -3248,7 +3251,7 @@ function prodStatusSection(p,ed){
         <td></td><td style="font-weight:600">${esc(x.l.desc)}${x.l.note?`<div class="mut" style="font-size:10.5px">${esc(x.l.note)}</div>`:''}</td>
         <td class="num">${NIS(x.budget)}</td><td class="num">${x.actual?NIS(x.actual):'—'}</td>
         <td class="num ${x.rem<0?'negv':x.actual?'pos':'mut'}">${x.rem<0?'+'+NIS(-x.rem):(x.actual?NIS(x.rem):'—')}</td>
-        ${lpCol()?`<td class="num">${NIS(linePreFee(p,x.l))}${lineCharge(p,x.l)!==linePreFee(p,x.l)?`<div class="mut" style="font-size:10px">+עמלה = ${NIS(lineCharge(p,x.l))}</div>`:''}</td><td class="num ${lineCharge(p,x.l)-(x.actual||x.budget)<0?'negv':'pos'}">${NIS(lineCharge(p,x.l)-(x.actual||x.budget))}</td>`:''}
+        ${lpCol()?`<td class="num">${NIS(linePreFee(p,x.l))}${lineCharge(p,x.l)!==linePreFee(p,x.l)?`<div class="mut" style="font-size:10px">+עמלה = ${NIS(lineCharge(p,x.l))}</div>`:''}</td><td class="num ${lineCharge(p,x.l)-(x.actual||x.budget)<0?'negv':'pos'}">${NIS(lineCharge(p,x.l)-(x.actual||x.budget))}${x.actual?`<div style="font-size:10.5px;font-weight:700;color:${lineCharge(p,x.l)/x.actual<1?'var(--red)':'var(--green)'}" title="כמה הלקוח משלם על כל שקל שעלה לך">×${(lineCharge(p,x.l)/x.actual).toFixed(2)}</div>`:''}</td>`:''}
         <td>${bar(x.pct===Infinity?1:x.pct,x.st)}</td><td>${stPill(x.st)}</td>
         <td class="mut">${x.n?x.n+' <span style="cursor:pointer;color:var(--sky)" onclick="PRODF={q:\'\',cat:\'\',inv:\'\',pay:\'\',min:\'\',max:\'\',line:\''+x.l.id+'\'};PRODTAB=\'actuals\';renderProd()">הצג</span>':'—'}</td>
         <td>${ed?`<button class="btn sm gray" style="padding:2px 8px;font-size:11px" onclick="quickExpense(${p.id},'${x.l.id}')">+ הוצאה</button>`:''}</td></tr>`).join('');}).join('')}
