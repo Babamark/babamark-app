@@ -3189,7 +3189,9 @@ function prodStatus(p){
   /* v7.5: הוצאה לא משויכת נחשבת כמי שנוגסת ביתרת התחזית — לא נוספת מעליה (אחרת נספרת פעמיים) */
   const unallocCost=unalloc.reduce((s,a)=>s+costOf(a),0);
   const remFc=L.reduce((s,x)=>s+Math.max(0,x.budget-x.actual),0);
-  const projected=k.actual+Math.max(0,remFc-unallocCost);
+  /* v7.5: הפקה שהסתיימה / חויבה — לא יצאו עוד הוצאות, הצפי = מה שיצא בפועל */
+  const closed=p.status==='הסתיימה'||['חשבונית הופקה','שולם'].includes(p.bill_status);
+  const projected=closed?k.actual:k.actual+Math.max(0,remFc-unallocCost);
   const committed=k.actual;                      /* מה שכבר יצא */
   const projFee=projected*((+p.fee_pct||0)/100);
   const billing=k.billing;                       /* מה שהלקוח משלם: חשבונית סופית / מחיר מאושר + חריגות / PO */
