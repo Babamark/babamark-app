@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.5</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.4</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -2408,6 +2408,7 @@ function renderProd(){
       ${ed?`<button class="btn sm gray" onclick="prodImportModal(${p.id},'actuals')">⬆ ייבוא מאקסל</button>`:''}
       ${ed?`<label class="btn sm gray" style="cursor:pointer;margin:0">📷 קבלה<input type="file" accept="image/*,.pdf" capture="environment" style="display:none" onchange="receiptUpload(${p.id},this.files[0]);this.value=''"></label>`:''}
       ${acAll.some(a=>actReceipts(a).length)?`<button class="btn sm gray" title="מוריד את הקבלות של השורות המסומנות (עמודה ראשונה) כקובץ ZIP" onclick="receiptsZip(${p.id},'sel')">⬇ ZIP מסומנות</button><button class="btn sm gray" title="מוריד את כל הקבלות המוצגות (אחרי סינון) כקובץ ZIP" onclick="receiptsZip(${p.id},'all')">⬇ ZIP הכל</button>`:''}
+      ${ed&&DB.productions.length>1?`<button class="btn sm gray" title="מעביר את השורות המסומנות (עמודה ראשונה) להפקה אחרת, כולל הקבלות" onclick="paMove(${p.id},[...document.querySelectorAll('.rcv_ck:checked')].map(c=>+c.dataset.i))">⇄ העבר מסומנות</button>`:''}
       ${ed?`<button class="btn sm" onclick="quickExpense(${p.id},PRODF.line||'')">+ הוצאה</button>`:''}
       </span>
     </div>
@@ -2424,7 +2425,7 @@ function renderProd(){
       <input placeholder="עד" dir="ltr" value="${esc(PRODF.max)}" onchange="pfSet('max',this.value)" style="padding:6px 10px;border:1px solid var(--line);border-radius:10px;width:70px;font-size:12.5px">
     </div>
     <div class="tblwrap"><table class="tbl"><thead><tr>
-      <th><input type="checkbox" title="סמן הכל" onchange="document.querySelectorAll('.rcv_ck').forEach(c=>c.checked=this.checked)"></th><th>מה</th><th>ספק</th><th>קטגוריה</th><th>סעיף בתחזית</th><th>שילמנו · לפני מע״מ</th><th>שילמנו · כולל</th><th title="עבודה שלנו (מפיקים, צלם שלנו, עריכה) — נשאר ביומן לתיעוד אבל לא נספר כהוצאה ולא יורד מהרווח">פנימי</th><th title="האם בהוצאה הזו יש מע״מ שאנחנו מקזזים. ללא מע״מ = הסכום ששולם הוא העלות המלאה (עוסק פטור, חו״ל, קבלה בלי מע״מ)">מע״מ</th>${showProfit()?'<th title="למלא רק כשיש מחיר ללקוח לפריט הזה (למשל אקטיבציה). ריק = הלקוח משלם על הסעיף כולו, לא על הקבלה">חיוב ללקוח <span class="mut" style="font-weight:400">· לפני מע״מ · אם יש לפריט</span></th><th>מרווח</th>':''}<th>מי שילם</th><th>חשבונית</th><th>תשלום</th><th>קבלה</th><th style="min-width:220px">סטטוס · הערות</th><th></th>
+      <th><input type="checkbox" title="סמן הכל" onchange="document.querySelectorAll('.rcv_ck').forEach(c=>c.checked=this.checked)"></th><th>מה</th><th>ספק</th><th>קטגוריה</th><th>סעיף בתחזית</th><th>שילמנו · לפני מע״מ</th><th>שילמנו · כולל</th><th title="עבודה שלנו (מפיקים, צלם שלנו, עריכה) — נשאר ביומן לתיעוד אבל לא נספר כהוצאה ולא יורד מהרווח">פנימי</th><th title="האם בהוצאה הזו יש מע״מ שאנחנו מקזזים. ללא מע״מ = הסכום ששולם הוא העלות המלאה (עוסק פטור, חו״ל, קבלה בלי מע״מ)">מע״מ</th>${showProfit()?'<th title="למלא רק כשיש מחיר ללקוח לפריט הזה (למשל אקטיבציה). ריק = הלקוח משלם על הסעיף כולו, לא על הקבלה">חיוב ללקוח <span class="mut" style="font-weight:400">· לפני מע״מ · אם יש לפריט</span></th><th>מרווח</th>':''}<th>מי שילם</th><th>חשבונית</th><th>תשלום</th><th>קבלה</th><th></th>
     </tr></thead><tbody>
     ${acAll.map((a,i)=>({a,i})).filter(({a})=>match(a)).map(({a,i})=>{const chg=(a.charge!=null&&a.charge!==''?+a.charge:(+a.amount||0));const mg=chg-(+a.amount||0);
       return `<tr${a.internal?' style="opacity:.6;background:#fbfbfd"':''}>
@@ -2443,13 +2444,7 @@ function renderProd(){
       <td><select class="cell" ${dis} onchange="paSet(${p.id},${i},'inv',this.value)">${INV2.map(x=>`<option value="${x}" ${actNorm(a).inv===x?'selected':''}>${x||'—'}</option>`).join('')}</select></td>
       <td><select class="cell" ${dis} onchange="paSet(${p.id},${i},'pay',this.value)">${PAY2.map(x=>`<option value="${x}" ${actNorm(a).pay===x?'selected':''}>${x||'—'}</option>`).join('')}</select></td>
       <td style="white-space:nowrap">${(()=>{const rs=actReceipts(a);return `${rs.length?`<a href="${esc(rs[0].url)}" target="_blank" title="פתח קבלה">📎</a>${rs.length>1?`<span style="cursor:pointer;font-size:11px;font-weight:700;color:var(--sky)" title="כל הקבלות" onclick="receiptsPopover(${p.id},${i})">×${rs.length}</span>`:''}${(()=>{if(!receiptsHaveAmt(a))return '';const d=receiptsSum(a)-Math.round((+a.amount||0)*(1+k.vrate));return Math.abs(d)<=1?`<span class="pos" style="font-size:11px" title="סך הקבלות תואם לשורה">✓</span>`:`<span class="${d<0?'negv':'negv'}" style="font-size:10.5px;cursor:pointer" title="סך הקבלות ${NIS(receiptsSum(a))} מול השורה — לחץ לפרטים" onclick="receiptsPopover(${p.id},${i})">${d<0?'חסר '+NIS(-d):'+'+NIS(d)}</span>`;})()}`:''}${ed?`<label style="cursor:pointer;margin-right:4px" title="${rs.length?'הוסף עוד קובץ':'העלה קובץ / תמונה של הקבלה'}"><span style="color:var(--sky);font-weight:700">⇪</span><input type="file" accept="image/*,.pdf" multiple style="display:none" onchange="receiptAttach(${p.id},${i},this.files);this.value=''"></label><span class="mut" style="cursor:pointer;font-size:11px;margin-right:4px" title="${rs.length?'ניהול קבלות / קישור':'הדבק קישור לקבלה'}" onclick="receiptsPopover(${p.id},${i})">${rs.length?'⋯':'🔗'}</span>`:''}`;})()}</td>
-      <td style="min-width:220px">${(()=>{const n=actNorm(a);const rs=actReceipts(a).length;const tags=[];
-        if(!rs)tags.push(['❌ חסרה חשבונית','#c0392b']);else tags.push(['✅ חשבונית','#1e8e3e']);
-        if(/הצעת מחיר/.test(a.note||''))tags.push(['⚠ הצעת מחיר בלבד','#b26a00']);
-        if(a.pay==='לא שולם'||n.pay==='לא שולם')tags.push(['💸 לשלם','#c0392b']);else if(a.pay==='שולם פרטי')tags.push(['↩ החזר ל'+(a.paid_by||a.who||'?'),'#b26a00']);else if(/שולם/.test(a.pay||''))tags.push(['✔ שולם','#1e8e3e']);
-        if(!a.line_id&&!a.internal)tags.push(['➕ לא בתחזית','#5b6bd6']);
-        return `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:3px">${tags.map(([t,c])=>`<span style="font-size:10px;font-weight:700;color:${c};border:1px solid ${c}33;background:${c}0f;border-radius:6px;padding:0 5px;white-space:nowrap">${t}</span>`).join('')}</div><textarea class="cell" ${dis} rows="1" style="width:100%;min-width:200px;font-size:11px;resize:vertical" placeholder="הוסף הערה…" onchange="paSet(${p.id},${i},'note',this.value)">${esc(a.note||'')}</textarea>`;})()}</td>
-      <td>${ed?`<button class="xbtn" onclick="paDel(${p.id},${i})">×</button>`:''}</td></tr>`;}).join('')}
+      <td style="white-space:nowrap">${ed?`<span class="mut" style="cursor:pointer;font-size:13px;margin-left:4px" title="העבר להפקה אחרת (כולל הקבלות)" onclick="paMove(${p.id},[${i}])">⇄</span><button class="xbtn" onclick="paDel(${p.id},${i})">×</button>`:''}</td></tr>`;}).join('')}
     ${(()=>{const shown=acAll.filter(match);const ex=shown.reduce((a,x)=>a+costOf(x),0);const intSum=shown.filter(x=>x.internal).reduce((a,x)=>a+(+x.amount||0),0);const incSum=shown.reduce((a,x)=>a+actInc(x,k.vrate),0);const chg=shown.reduce((a,x)=>a+((x.charge!=null&&x.charge!=='')?+x.charge:(+x.amount||0)),0);
       const byPayer={};shown.forEach(x=>{const w=x.paid_by||'לא צוין';byPayer[w]=(byPayer[w]||0)+(+x.amount||0);});
       return `<tr style="background:#f4f5fb;font-weight:700"><td colspan="5">סה״כ ${filtering?'(מסונן) ':''}· ${shown.length} הוצאות</td><td class="num">${NIS(ex)}</td><td class="num">${NIS(incSum)}</td><td class="mut" style="font-size:10.5px;font-weight:400;white-space:nowrap">${intSum?'פנימי '+NIS(intSum):''}</td><td></td>${showProfit()?`<td class="num">${NIS(chg)}</td><td class="num ${chg-ex<0?'negv':'pos'}">${NIS(chg-ex)}</td>`:''}<td colspan="5" class="mut" style="font-weight:400;font-size:11px">${Object.entries(byPayer).map(([w,v])=>esc(w)+' '+NIS(v)).join(' · ')}</td></tr>`;})()}
@@ -3192,12 +3187,7 @@ function prodStatus(p){
   const idle=L.filter(x=>x.st==='idle');
   const idleSum=idle.reduce((s,x)=>s+x.budget,0);
   /* צפי סיום: כל סעיף — הגבוה מבין תקציב/בפועל (מניחים שסעיפים שלא נוצלו עוד ינוצלו) + הוצאות לא משויכות */
-  /* v7.5: הוצאה לא משויכת נחשבת כמי שנוגסת ביתרת התחזית — לא נוספת מעליה (אחרת נספרת פעמיים) */
-  const unallocCost=unalloc.reduce((s,a)=>s+costOf(a),0);
-  const remFc=L.reduce((s,x)=>s+Math.max(0,x.budget-x.actual),0);
-  /* v7.5: הפקה שהסתיימה / חויבה — לא יצאו עוד הוצאות, הצפי = מה שיצא בפועל */
-  const closed=p.status==='הסתיימה'||['חשבונית הופקה','שולם'].includes(p.bill_status);
-  const projected=closed?k.actual:k.actual+Math.max(0,remFc-unallocCost);
+  const projected=L.reduce((s,x)=>s+Math.max(x.budget,x.actual),0)+unallocSum;
   const committed=k.actual;                      /* מה שכבר יצא */
   const projFee=projected*((+p.fee_pct||0)/100);
   const billing=k.billing;                       /* מה שהלקוח משלם: חשבונית סופית / מחיר מאושר + חריגות / PO */
@@ -3259,7 +3249,7 @@ function prodStatusSection(p,ed){
         <td></td><td style="font-weight:600">${esc(x.l.desc)}${x.l.note?`<div class="mut" style="font-size:10.5px">${esc(x.l.note)}</div>`:''}</td>
         <td class="num">${NIS(x.budget)}</td><td class="num">${x.actual?NIS(x.actual):'—'}</td>
         <td class="num ${x.rem<0?'negv':x.actual?'pos':'mut'}">${x.rem<0?'+'+NIS(-x.rem):(x.actual?NIS(x.rem):'—')}</td>
-        ${lpCol()?`<td class="num">${NIS(linePreFee(p,x.l))}${lineCharge(p,x.l)!==linePreFee(p,x.l)?`<div class="mut" style="font-size:10px">+עמלה = ${NIS(lineCharge(p,x.l))}</div>`:''}</td><td class="num ${lineCharge(p,x.l)-(x.actual||x.budget)<0?'negv':'pos'}">${NIS(lineCharge(p,x.l)-(x.actual||x.budget))}${x.actual?`<div style="font-size:10.5px;font-weight:700;color:${lineCharge(p,x.l)/x.actual<1?'var(--red)':'var(--green)'}" title="כמה הלקוח משלם על כל שקל שעלה לך">×${(lineCharge(p,x.l)/x.actual).toFixed(2)}</div>`:''}</td>`:''}
+        ${lpCol()?`<td class="num">${NIS(linePreFee(p,x.l))}${lineCharge(p,x.l)!==linePreFee(p,x.l)?`<div class="mut" style="font-size:10px">+עמלה = ${NIS(lineCharge(p,x.l))}</div>`:''}</td><td class="num ${lineCharge(p,x.l)-(x.actual||x.budget)<0?'negv':'pos'}">${NIS(lineCharge(p,x.l)-(x.actual||x.budget))}</td>`:''}
         <td>${bar(x.pct===Infinity?1:x.pct,x.st)}</td><td>${stPill(x.st)}</td>
         <td class="mut">${x.n?x.n+' <span style="cursor:pointer;color:var(--sky)" onclick="PRODF={q:\'\',cat:\'\',inv:\'\',pay:\'\',min:\'\',max:\'\',line:\''+x.l.id+'\'};PRODTAB=\'actuals\';renderProd()">הצג</span>':'—'}</td>
         <td>${ed?`<button class="btn sm gray" style="padding:2px 8px;font-size:11px" onclick="quickExpense(${p.id},'${x.l.id}')">+ הוצאה</button>`:''}</td></tr>`).join('');}).join('')}
@@ -3398,6 +3388,29 @@ async function paSetNoVat(id,i,on){const p=prodn(id);const a=structuredClone(p.a
 /* v7.4: סל מחיקה + Undo להוצאות ולסעיפי תחזית — נשמר ב-settings (prod_trash), 100 אחרונים */
 async function trashPush(kind,pid,item){const t=sj('prod_trash',[]);t.unshift({kind,pid,item,at:new Date().toISOString(),by:ME?.name||''});await setSetting('prod_trash',t.slice(0,300));}
 function trashFor(pid){return sj('prod_trash',[]).map((x,i)=>({...x,i})).filter(x=>x.pid===pid);}
+/* העברת שורות הוצאה (כולל קבלות) להפקה אחרת */
+function paMove(pid,idxs){
+  const p=prodn(pid);idxs=(idxs||[]).filter(i=>(p.actuals||[])[i]);
+  if(!idxs.length){toast('סמן שורות קודם (עמודה ראשונה)');return;}
+  const others=DB.productions.filter(x=>x.id!==pid);if(!others.length){toast('אין הפקה אחרת');return;}
+  const rows=idxs.map(i=>p.actuals[i]);const sum=rows.reduce((t,a)=>t+(+a.amount||0),0);
+  modal(`<h3>העברת ${rows.length>1?rows.length+' הוצאות':'הוצאה'} להפקה אחרת</h3>
+  <div class="mut" style="font-size:12px;margin-bottom:8px">${rows.map(a=>esc(a.desc||'')+(a.supplier?' · '+esc(a.supplier):'')+' · '+NIS(+a.amount||0)).join('<br>')}<br><b>סה״כ ${NIS(sum)}</b> · הקבלות עוברות יחד עם השורות</div>
+  <label>אל הפקה</label><select id="pmvTo">${others.map(x=>`<option value="${x.id}">${esc(x.name)}${x.client_name?' · '+esc(x.client_name):''}</option>`).join('')}</select>
+  <label style="margin-top:8px">סעיף בתחזית בהפקה היעד</label><select id="pmvLine"><option value="">ללא שיוך (אשייך אחר כך)</option></select>
+  <div class="row" style="gap:8px;margin-top:12px"><button class="btn green" onclick="paMoveGo(${pid},[${idxs.join(',')}])">⇄ העבר</button><button class="btn gray" onclick="closeModal()">ביטול</button></div>`);
+  const fill=()=>{const t=prodn(+$('pmvTo').value);$('pmvLine').innerHTML='<option value="">ללא שיוך (אשייך אחר כך)</option>'+(t?.lines||[]).map(l=>`<option value="${l.id}">${esc(lineLabel(l))}</option>`).join('');};
+  fill();$('pmvTo').onchange=fill;
+}
+async function paMoveGo(pid,idxs){
+  const tid=+$('pmvTo').value;const lid=$('pmvLine').value;const src=prodn(pid),dst=prodn(tid);if(!src||!dst)return;
+  const sa=structuredClone(src.actuals||[]);const da=structuredClone(dst.actuals||[]);
+  const moving=[...idxs].sort((a,b)=>b-a).map(i=>sa.splice(i,1)[0]).reverse();
+  moving.forEach(a=>{delete a.line_id;delete a.sub_id;if(lid)a.line_id=lid;a.note=((a.note||'')+' · הועבר מ-'+src.name).replace(/^ · /,'');da.push(a);});
+  if(!await upd('productions',pid,{actuals:sa}))return;
+  if(!await upd('productions',tid,{actuals:da})){toast('ההעברה נכשלה באמצע — בדוק את שתי ההפקות');return;}
+  closeModal();renderProd();toast(moving.length+' הוצאות הועברו ל-'+dst.name+' ✓',4000);
+}
 async function paDel(id,i){const p=prodn(id);const a=structuredClone(p.actuals||[]);const [gone]=a.splice(i,1);await trashPush('actual',id,gone);await upd('productions',id,{actuals:a});renderProd();
   toast('נמחק · <span style="cursor:pointer;text-decoration:underline" onclick="trashRestore(0)">בטל (Undo)</span>',6000);}
 async function paClearAll(pid){const p=prodn(pid);const n=(p.actuals||[]).length;if(!n)return;if(!confirm('למחוק את כל '+n+' ההוצאות של ההפקה? (כולן יישמרו בסל השחזור)'))return;
