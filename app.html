@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.4</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.5</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -706,23 +706,37 @@ const hiNorm=s=>String(s??'').trim().toLowerCase().replace(/["'׳״]/g,'').repla
 const hiIsTot=s=>/^סה.?כ|^total|^סהכ|^סך/i.test(hiNorm(s));
 function parseHoursAoa(aoa){
   aoa=(aoa||[]).filter(r=>r&&r.some(c=>c!==''&&c!=null));
-  if(!aoa.length)return{rows:[],fmt:'?'};
-  const hdr=aoa[0].map(hiNorm);
-  const fi=(...n)=>hdr.findIndex(h=>n.some(x=>h.includes(x)));
-  let iC=fi('brand','לקוח','client','מותג'),iD=fi('project','תיאור','desc','פרויקט','עבודה'),iH=fi('ttl','שעות','hours','זמן','time'),iM=fi('comment','הערה','note');
-  let fmt='auto';
-  if(iC<0||iH<0){iC=0;iD=1;iH=2;iM=3;fmt='positional';}
-  if(iD<0)iD=iC+1;
+  if(!aoa.length)return{rows:[],fmt:'?',why:'הקובץ ריק'};
+  const HC=['brand','לקוח','client','מותג','שם לקוח','ברנד'],HD=['project','תיאור','desc','פרויקט','עבודה','פירוט','משימה','task','item'],
+        HH=['ttl','שעות','hours','זמן','time','hrs'],HA=['סכום','עלות','amount','price','מחיר','₪','sum','total','סה"כ','סה״כ','cost','תשלום'],HM=['comment','הערה','note','הערות'];
+  const fiIn=(hdr,n)=>hdr.findIndex(h=>h&&n.some(x=>h.includes(hiNorm(x))));
+  /* מחפשים את שורת הכותרות — לא בהכרח השורה הראשונה (כותרת קובץ, שם מעצב, חודש…) */
+  let hi=-1,best=-1;
+  for(let i=0;i<Math.min(aoa.length,30);i++){const hdr=aoa[i].map(hiNorm);
+    const sc=(fiIn(hdr,HC)>=0)+(fiIn(hdr,HD)>=0)+(fiIn(hdr,HH)>=0)+(fiIn(hdr,HA)>=0);
+    if(sc>best&&(fiIn(hdr,HH)>=0||fiIn(hdr,HA)>=0)){best=sc;hi=i;}}
+  let fmt='auto',iC,iD,iH,iA,iM;
+  if(hi>=0){const hdr=aoa[hi].map(hiNorm);iC=fiIn(hdr,HC);iD=fiIn(hdr,HD);iH=fiIn(hdr,HH);iA=fiIn(hdr,HA);iM=fiIn(hdr,HM);
+    if(iC<0)iC=[0,1,2].find(j=>j!==iD&&j!==iH&&j!==iA)??0;
+    if(iD<0)iD=[iC+1,iC+2,0,1,2].find(j=>j!==iC&&j!==iH&&j!==iA&&j<aoa[hi].length)??iC+1;}
+  else{hi=0;iC=0;iD=1;iH=2;iA=-1;iM=3;fmt='positional';}
+  const num=v=>{if(typeof v==='number')return v;const t=String(v??'').replace(/[₪,\s]/g,'').replace(/^(\d+):(\d+)$/,(m,a,b)=>a+'.'+Math.round(b/60*100));const n=parseFloat(t);return isNaN(n)?0:n;};
   const rows=[];let cur='';
-  for(let i=1;i<aoa.length;i++){const r=aoa[i];
-    const a=String(r[iC]??'').trim(),d=String(r[iD]??'').trim(),h=r[iH];
+  for(let i=hi+1;i<aoa.length;i++){const r=aoa[i];
+    const a=String(r[iC]??'').trim(),d=String(r[iD]??'').trim();
     if(hiIsTot(a)||hiIsTot(d))continue;
     if(a)cur=a;
-    const hn=typeof h==='number'?h:parseFloat(String(h??'').replace(',','.'));
-    if(!d||!(hn>0))continue;               /* שורות סיכום ביניים (בלי תיאור) — לא מייבאים */
-    rows.push({brand:cur||a||'?',desc:d,hours:Math.round(hn*100)/100,comment:iM>=0?String(r[iM]??'').trim():''});
+    const hn=iH>=0?num(r[iH]):0,an=iA>=0?num(r[iA]):0;
+    if(!d&&!a)continue;
+    if(!(hn>0)&&!(an>0))continue;          /* שורות סיכום ביניים — לא מייבאים */
+    /* יש שעות → שורת שעות רגילה. אין שעות אבל יש סכום → שורת הוצאה: כמות 1 במחיר הסכום */
+    const row={brand:cur||a||'?',desc:d||a,hours:hn>0?Math.round(hn*100)/100:1,comment:iM>=0?String(r[iM]??'').trim():''};
+    if(!(hn>0)&&an>0){row.amount=Math.round(an*100)/100;row.isAmount=true;}
+    else if(an>0)row.amount=Math.round(an*100)/100;
+    rows.push(row);
   }
-  return{rows,fmt};
+  const why=rows.length?'':'לא זוהו שורות. כותרות שנמצאו: '+(hi>=0?aoa[hi].filter(Boolean).join(' | '):'—')+'. צריך עמודת שעות (שעות/Hours/TTL) או עמודת סכום (סכום/עלות/Amount) ועמודת תיאור/לקוח.';
+  return{rows,fmt,why,hasAmount:rows.some(r=>r.isAmount)};
 }
 function hiGuessClient(brand){
   const b=hiNorm(brand);if(!b)return '';
@@ -739,9 +753,9 @@ function hiGuessClient(brand){
 function hoursImportModal(){
   if(!CURMONTH){toast('בחר חודש');return;}
   const designers=DB.team.filter(t=>t.active!==false);
-  modal(`<h3>ייבוא שעות מעצב · ${heLabel(CURMONTH)}</h3>
-  <p class="mut">מעלים את קובץ השעות שהמעצב שלח (אקסל / CSV). המערכת מזהה לקוח · פרויקט · שעות, ומציגה טבלת אישור לפני שמשהו נשמר.<br>
-  נתמך: הפורמט של רועי (BRAND / PROJECT / TTL TIME / COMMENTS) והפורמט של יובל (לקוח / תיאור עבודה / תאריך / שעות).</p>
+  modal(`<h3>ייבוא שעות / הוצאות מעצב · ${heLabel(CURMONTH)}</h3>
+  <p class="mut">מעלים את הקובץ שהמעצב שלח (אקסל / CSV, כל גיליון). המערכת מוצאת לבד את שורת הכותרות, מזהה לקוח · תיאור · שעות <b>או סכום</b>, ומציגה טבלת אישור לפני שמשהו נשמר.<br>
+  קובץ עם עמודת סכום (בלי שעות) נכנס כהוצאות: כמות 1 × הסכום, לעלות ולחיוב כאחד — אפשר לשנות את החיוב בטבלת האישור.</p>
   <label>מי המעצב/ת</label><select id="hiWho">${designers.map(t=>`<option ${t.kind==='מעצב'?'':''}>${esc(t.name)}</option>`).join('')}</select>
   <label>קובץ שעות</label><input type="file" id="hiFile" accept=".xlsx,.xls,.csv,.txt" style="padding:8px">
   <div class="row" style="margin-top:16px">
@@ -756,13 +770,18 @@ async function hiParse(){
   try{
     if(/\.(csv|txt)$/i.test(f.name)){const txt=await f.text();const sep=txt.includes('\t')?'\t':',';
       aoa=txt.split(/\r?\n/).map(l=>l.split(sep).map(x=>{const s=x.trim().replace(/^"|"$/g,'');const n=+s;return s!==''&&!isNaN(n)?n:s;}));}
-    else{const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
-      aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,blankrows:false,defval:''});}
+    else{if(typeof XLSX==='undefined')throw new Error('ספריית האקסל לא נטענה — רענן את הדף');
+      const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:false});
+      /* בוחרים את הגיליון שממנו יוצאות הכי הרבה שורות */
+      let bestA=null,bestN=-1;
+      for(const n of wb.SheetNames){const a=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,blankrows:false,defval:''});const k=parseHoursAoa(a).rows.length;if(k>bestN){bestN=k;bestA=a;}}
+      aoa=bestA||[];}
   }catch(e){$('hiErr').textContent='לא הצלחתי לקרוא את הקובץ: '+e.message;return;}
-  const {rows}=parseHoursAoa(aoa);
-  if(!rows.length){$('hiErr').textContent='לא נמצאו שורות עם תיאור + שעות. בדוק שהשורה הראשונה היא כותרות.';return;}
+  const {rows,why}=parseHoursAoa(aoa);
+  if(!rows.length){$('hiErr').textContent=why||'לא נמצאו שורות עם תיאור + שעות/סכום.';return;}
   const dup=entriesOf(CURMONTH).some(e=>(e.work_lines||[]).some(w=>w.src_file===f.name));
-  HI={who,file:f.name,saveRates:true,rows:rows.map(r=>{const client=hiGuessClient(r.brand);const rt=client?rateFor(client,who):rateOf(who);
+  HI={who,file:f.name,saveRates:!rows.some(r=>r.isAmount),rows:rows.map(r=>{const client=hiGuessClient(r.brand);const rt=client?rateFor(client,who):rateOf(who);
+    if(r.isAmount)return{...r,client,bill_hours:1,cost_rate:r.amount,bill_rate:r.amount,rateTouched:true,include:true};
     return{...r,client,bill_hours:r.hours,cost_rate:+rt.cost_rate||0,bill_rate:+rt.bill_rate||0,include:true};})};
   if(dup&&!confirm('קובץ בשם "'+f.name+'" כבר יובא לחודש '+heLabel(CURMONTH)+'.\nלהמשיך בכל זאת? (השורות יתווספו פעם נוספת)'))return;
   hiRender();
