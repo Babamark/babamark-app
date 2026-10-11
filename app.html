@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.6</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.7</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -3409,8 +3409,8 @@ function reconData(p,k){
     const v=actInc(a,k.vrate),st=actNorm(a),docs=actReceipts(a).length,hasDoc=st.inv==='יש'||docs>0;
     const key=supKey(a.supplier)||'__none';
     const g=S[key]=S[key]||{key,name:(a.supplier||'').trim()||'ללא ספק',n:0,total:0,paid:0,priv:0,open:0,docs:0,wait:0,miss:0,missAmt:0,payers:{},idx:[],openIdx:[],noDocIdx:[]};
-    g.n++;g.total+=v;g.idx.push(i);T.total+=v;
-    if(st.pay==='שולם'){g.paid+=v;T.paid+=v;}
+    g.n++;g.total+=v;g.idx.push(i);T.total+=v;if(a.who){g.who=g.who||{};g.who[a.who]=1;}
+    if(st.pay==='שולם'){g.paid+=v;T.paid+=v;const w=a.paid_by||'באבאמרק';g.paidBy=g.paidBy||{};g.paidBy[w]=(g.paidBy[w]||0)+v;}
     else if(st.pay==='שולם פרטי'){g.priv+=v;T.priv+=v;const w=a.paid_by||'לא צוין מי';g.payers[w]=(g.payers[w]||0)+v;
       const q=P[w]=P[w]||{name:w,n:0,total:0,back:0,open:0,noDoc:0,idx:[]};q.n++;q.total+=v;q.idx.push(i);if(a.reimbursed)q.back+=v;else{q.open+=v;T.privOpen+=v;}if(!hasDoc)q.noDoc++;}
     else{g.open+=v;T.open+=v;g.openIdx.push(i);}
@@ -3447,13 +3447,13 @@ function prodReconSection(p,k,ed){
     </div>
     <p class="mut" style="margin:4px 0 8px">סכומים כולל מע״מ (מה שבאמת יוצא מהחשבון). <b>פתוח</b> = שורות בלי סימון תשלום או "לא שולם" — זה מה שעוד צריך להעביר לספק. <b>שולם פרטי</b> = מישהו מהצוות שילם מכיסו, הספק סגור אבל צריך להחזיר לו. <b>מסמך</b> = סומן "יש חשבונית" או מצורפת קבלה. לחיצה על שורה פותחת את היומן מסונן לספק.</p>
     <div class="tblwrap"><table class="tbl" style="font-size:12.5px"><thead><tr>
-      <th>ספק</th><th>שורות</th><th>סה״כ</th><th>שולם</th><th>שולם פרטי (מי)</th><th>פתוח להעברה</th><th>מסמכים</th><th>סטטוס</th>${ed?'<th></th>':''}
+      <th>ספק</th><th>שורות</th><th>סה״כ</th><th>שולם (מי)</th><th>שולם פרטי (מי)</th><th>פתוח להעברה</th><th>מסמכים</th><th>סטטוס</th>${ed?'<th></th>':''}
     </tr></thead><tbody>
     ${sups.map(g=>`<tr style="${g.key==='__none'?'background:#fff7ed':''}">
-      <td style="font-weight:600;cursor:pointer;color:var(--sky)" onclick="${go('sup',g.key)}">${esc(g.name)} <span class="mut">›</span></td>
+      <td style="font-weight:600;cursor:pointer;color:var(--sky)" onclick="${go('sup',g.key)}">${esc(g.name)} <span class="mut">›</span>${g.who?`<div class="mut" style="font-size:10.5px;font-weight:400">אחראי: ${esc(Object.keys(g.who).join(', '))}</div>`:''}</td>
       <td class="num">${g.n}</td>
       <td class="num" style="font-weight:600">${R(g.total)}</td>
-      <td class="num">${g.paid?R(g.paid):'—'}</td>
+      <td class="num">${g.paid?R(g.paid)+' <span class="mut" style="font-size:11px">('+Object.entries(g.paidBy||{}).map(([w,v])=>esc(w)+(Object.keys(g.paidBy).length>1?' '+R(v):'')).join(', ')+')</span>':'—'}</td>
       <td class="num">${g.priv?R(g.priv)+' <span class="mut" style="font-size:11px">('+Object.entries(g.payers).map(([w,v])=>esc(w)+' '+R(v)).join(', ')+')</span>':'—'}</td>
       <td class="num ${g.open>0.5?'negv':''}" style="font-weight:600">${g.open>0.5?R(g.open):'—'}</td>
       <td class="num" title="יש מסמך / ממתין לחשבונית / חסר">${g.docs}/${g.n}${g.wait?' <span class="mut">⏳'+g.wait+'</span>':''}${g.miss?' <span style="color:#b42318">✕'+g.miss+'</span>':''}</td>
