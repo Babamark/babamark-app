@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.9</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.0</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -3215,7 +3215,9 @@ function prodStatus(p){
   const idle=L.filter(x=>x.st==='idle');
   const idleSum=idle.reduce((s,x)=>s+x.budget,0);
   /* צפי סיום: כל סעיף — הגבוה מבין תקציב/בפועל (מניחים שסעיפים שלא נוצלו עוד ינוצלו) + הוצאות לא משויכות */
-  const projected=L.reduce((s,x)=>s+Math.max(x.budget,x.actual),0)+unallocSum;
+  /* הפקה שהסתיימה: אין עוד הוצאות מתוכננות — הצפי = מה שיצא בפועל (סעיפים שלא נוצלו לא נספרים) */
+  const done=p.status==='הסתיימה';
+  const projected=done?k.actual:L.reduce((s,x)=>s+Math.max(x.budget,x.actual),0)+unallocSum;
   const committed=k.actual;                      /* מה שכבר יצא */
   const projFee=projected*((+p.fee_pct||0)/100);
   const billing=k.billing;                       /* מה שהלקוח משלם: חשבונית סופית / מחיר מאושר + חריגות / PO */
@@ -3249,7 +3251,7 @@ function prodStatusSection(p,ed){
       ${card('זליגות (חריגות)',(S.overSum?'+':'')+NIS(S.overSum)+' '+sym,S.overSum?'neg':'profit')}
       ${card('לא משויך לסעיף',S.unalloc.length?NIS(S.unallocSum)+' '+sym+' · '+S.unalloc.length:'—',S.unalloc.length?'out':'')}
       ${card('סעיפים שטרם יצאו',S.idle.length?NIS(S.idleSum)+' '+sym+' · '+S.idle.length:'—')}
-      ${card('צפי עלות בסיום',NIS(S.projected)+' '+sym,S.projected>ref?'neg':'')}
+      ${card(p.status==='הסתיימה'?'עלות סופית (ההפקה הסתיימה)':'צפי עלות בסיום',NIS(S.projected)+' '+sym,S.projected>ref?'neg':'')}
       ${S.billable.length?card('חריגות לחיוב בנפרד','+'+NIS(S.billableSum)+' '+sym+' · '+S.billable.length,'profit'):''}
       ${k.changesCharge?card('עדכונים מאושרים ללקוח','+'+NIS(k.changesCharge)+' '+sym+(k.noPo.length?' <span class="negv" style="font-size:11px">· '+NIS(k.noPoSum)+' ללא PO</span>':''),k.noPo.length?'neg':'profit'):''}
       ${showProfit()?card('רווח צפוי',NIS(S.projProfit)+' '+sym+' <span class="mut" style="font-size:11px">מתוך '+NIS(S.billing)+'</span>',S.projProfit<0?'neg':'profit'):''}
