@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.8</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v7.9</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -3413,6 +3413,7 @@ function reconData(p,k){
     const key=supKey(a.supplier)||'__none';
     const g=S[key]=S[key]||{key,name:(a.supplier||'').trim()||'ללא ספק',n:0,total:0,paid:0,priv:0,open:0,docs:0,wait:0,miss:0,missAmt:0,payers:{},idx:[],openIdx:[],noDocIdx:[]};
     g.n++;g.total+=v;g.idx.push(i);T.total+=v;if(a.who){g.who=g.who||{};g.who[a.who]=1;}
+    actReceipts(a).forEach(r=>{if(r.shared){g.sharedDocs=g.sharedDocs||{};g.sharedDocs[r.url]=r.name||'חשבונית';}});
     if(st.pay==='שולם'){g.paid+=v;T.paid+=v;const w=a.paid_by||'באבאמרק';g.paidBy=g.paidBy||{};g.paidBy[w]=(g.paidBy[w]||0)+v;}
     else if(st.pay==='שולם פרטי'){g.priv+=v;T.priv+=v;const w=a.paid_by||'לא צוין מי';g.payers[w]=(g.payers[w]||0)+v;
       const q=P[w]=P[w]||{name:w,n:0,total:0,back:0,open:0,noDoc:0,idx:[]};q.n++;q.total+=v;q.idx.push(i);if(a.reimbursed)q.back+=v;else{q.open+=v;T.privOpen+=v;}if(!hasDoc)q.noDoc++;}
@@ -3460,7 +3461,7 @@ function prodReconSection(p,k,ed){
       <td class="num">${g.paid?R(g.paid)+' <span class="mut" style="font-size:11px">('+Object.entries(g.paidBy||{}).map(([w,v])=>esc(w)+(Object.keys(g.paidBy).length>1?' '+R(v):'')).join(', ')+')</span>':'—'}</td>
       <td class="num">${g.priv?R(g.priv)+' <span class="mut" style="font-size:11px">('+Object.entries(g.payers).map(([w,v])=>esc(w)+' '+R(v)).join(', ')+')</span>':'—'}</td>
       <td class="num ${g.open>0.5?'negv':''}" style="font-weight:600">${g.open>0.5?R(g.open):'—'}</td>
-      <td class="num" title="יש מסמך / ממתין לחשבונית / חסר">${g.docs}/${g.n}${g.wait?' <span class="mut">⏳'+g.wait+'</span>':''}${g.miss?' <span style="color:#b42318">✕'+g.miss+'</span>':''}</td>
+      <td class="num" title="יש מסמך / ממתין לחשבונית / חסר">${g.docs}/${g.n}${g.wait?' <span class="mut">⏳'+g.wait+'</span>':''}${g.miss?' <span style="color:#b42318">✕'+g.miss+'</span>':''}${g.sharedDocs?'<div style="font-size:11px;white-space:nowrap">'+Object.entries(g.sharedDocs).map(([u,n])=>`<a href="${esc(u)}" target="_blank" title="${esc(n)}">📎 מרוכז</a>`).join(' ')+'</div>':''}</td>
       <td>${pill(g)}</td>
       ${ed?`<td style="white-space:nowrap">${g.openIdx.length&&g.key!=='__none'?`<button class="btn sm green" style="padding:3px 9px;font-size:11px" title="מסמן את כל השורות הפתוחות של הספק כשולם (אחרי שהעברת)" onclick="paBulk(${p.id},[${g.openIdx}],'pay','שולם','${esc(g.name)}')">✓ העברתי</button>`:''}
         ${g.noDocIdx.length&&g.key!=='__none'?`<button class="btn sm gray" style="padding:3px 9px;font-size:11px" title="מסמן 'יש חשבונית' לכל השורות של הספק שאין להן מסמך" onclick="paBulk(${p.id},[${g.noDocIdx}],'inv','יש','${esc(g.name)}')">🧾 קיבלתי חשבונית</button>`:''}
@@ -3503,9 +3504,12 @@ async function supAttach(pid,key,files){
   const a=structuredClone(p.actuals);
   idxs.forEach(i=>{receiptsNormalize(a[i]);docs.forEach(d=>{if(!a[i].receipts.some(r=>r.url===d.url))a[i].receipts.push({...d,amount:null});});const st=actNorm(a[i]);a[i].inv='יש';a[i].pay=st.pay;delete a[i].invoice;});
   await upd('productions',pid,{actuals:a});renderProd();
-  let msg=docs.length+' מסמכים צורפו ל-'+idxs.length+' שורות של '+sup+' · סומן "יש חשבונית"';
-  if(ocrN){const diff=Math.round(ocrSum-rowsInc);msg+=` · בחשבונית ${NIS(ocrSum)} ₪ מול ${NIS(Math.round(rowsInc))} ₪ בשורות`+(Math.abs(diff)<2?' ✓ תואם':` ⚠ הפרש ${NIS(diff)} ₪`);}
-  toast(msg,12000);
+  const diff=Math.round(ocrSum-rowsInc);
+  modal(`<h3>✓ החשבונית צורפה · ${esc(sup)}</h3>
+  <p>${docs.length} ${docs.length>1?'מסמכים צורפו':'מסמך צורף'} ל-<b>${idxs.length}</b> שורות של הספק, וכולן סומנו <b>"יש חשבונית"</b>.</p>
+  ${ocrN?`<p>בחשבונית נקרא: <b>${NIS(Math.round(ocrSum))} ₪</b> · סה״כ השורות של הספק (כולל מע״מ): <b>${NIS(Math.round(rowsInc))} ₪</b><br>${Math.abs(diff)<2?'<span class="pos" style="font-weight:700">✓ תואם</span>':`<span class="negv" style="font-weight:700">⚠ הפרש ${NIS(diff)} ₪</span> — בדוק אם חסרה שורה או שהסכום בשורה לא מדויק`}</p>`:'<p class="mut">לא הצלחתי לקרוא סכום מהמסמך, ההשוואה לא בוצעה.</p>'}
+  <p class="mut" style="font-size:12px">המסמך יופיע כ-📎 בכל שורה ביומן, ובחבילה לרו״ח הוא יורד פעם אחת.</p>
+  <div class="row" style="margin-top:12px"><button class="btn" onclick="closeModal()">סגור</button></div>`);
 }
 /* חבילה לרו״ח: ZIP של כל המסמכים + אקסל התחשבנות */
 async function accountantPack(pid){
