@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.0</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.1</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -2379,7 +2379,16 @@ async function newProdn(){
 async function delProdn(id){if(!confirm('למחוק את ההפקה?'))return;if(await del('productions',id))rProductions();}
 function prodn(id){return DB.productions.find(x=>x.id===id);}
 let PRODV=null;
-function openProdn(id){PRODV=id;PRODF=PRODF0();PRODTAB='status';renderProd();}
+function openProdn(id){PRODV=id;PRODF=PRODF0();PRODTAB='status';renderProd();prodRefresh(id,true);}
+/* v8.1: רענון ההפקה מהשרת — כדי לא לעבוד על עותק ישן (שינויים ממחשב אחר / תיקונים ישירים בבסיס הנתונים) */
+async function prodRefresh(id,silent){
+  try{const {data,error}=await sb.from('productions').select('*').eq('id',id).single();if(error||!data)return;
+    const i=DB.productions.findIndex(x=>x.id===id);if(i<0)return;
+    const old=DB.productions[i];const changed=JSON.stringify(old.actuals)!==JSON.stringify(data.actuals)||JSON.stringify(old.lines)!==JSON.stringify(data.lines)||old.status!==data.status||old.client_name!==data.client_name;
+    DB.productions[i]={...old,...data,pos:old.pos};
+    if(changed&&PRODV===id){renderProd();if(!silent)toast('ההפקה רועננה מהשרת ✓');}else if(!silent)toast('אין שינויים');
+  }catch(e){}
+}
 function pfSet(k,v){PRODF[k]=v;renderProd();}
 function prodBack(){PRODV=null;rProductions();}
 const PRODF0=()=>({q:'',cat:'',inv:'',pay:'',min:'',max:'',line:'',sup:'',payer:''});
@@ -3450,6 +3459,7 @@ function prodReconSection(p,k,ed){
         ${can('export')?`<button class="btn sm gray" onclick="exportRecon(${p.id})">⬇ אקסל</button>
         <button class="btn sm" title="חבילה לרו״ח: ZIP של כל הקבלות והחשבוניות (מסמך מרוכז פעם אחת) + אקסל עם כל השורות, לפי ספק ומי שילם" onclick="accountantPack(${p.id})">📦 חבילה לרו״ח</button>`:''}
         <button class="btn sm gray" onclick="PRODTAB='actuals';renderProd()">← ליומן</button>
+        <button class="btn sm gray" title="טוען מחדש את ההפקה מהשרת" onclick="prodRefresh(${p.id})">⟳</button>
       </span>
     </div>
     <p class="mut" style="margin:4px 0 8px">סכומים כולל מע״מ (מה שבאמת יוצא מהחשבון). <b>פתוח</b> = שורות בלי סימון תשלום או "לא שולם" — זה מה שעוד צריך להעביר לספק. <b>שולם פרטי</b> = מישהו מהצוות שילם מכיסו, הספק סגור אבל צריך להחזיר לו. <b>מסמך</b> = סומן "יש חשבונית" או מצורפת קבלה. לחיצה על שורה פותחת את היומן מסונן לספק.</p>
