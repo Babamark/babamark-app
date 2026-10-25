@@ -448,9 +448,20 @@ function renderShell(){
 function tab(t){CUR=t;renderShell();render();}
 const SEL=new Set();
 function setMonth(m){CURMONTH=m;SEL.clear();render();}
+/* v8.2 — רינדור מחדש אחרי עריכה שומר על מקום הגלילה (אנכי + אופקי בטבלאות) במקום לקפוץ להתחלה */
+let LASTCUR=null;
+function keepScroll(fn){
+  const y=window.scrollY;const sl=[...document.querySelectorAll('.tblwrap')].map(e=>e.scrollLeft);
+  const act=document.activeElement;const aid=act&&act.id?act.id:null;
+  fn();
+  const restore=()=>{window.scrollTo(0,y);document.querySelectorAll('.tblwrap').forEach((e,i)=>{if(sl[i])e.scrollLeft=sl[i];});if(aid&&$(aid)&&$(aid).tagName!=='BUTTON')try{$(aid).focus({preventScroll:true});}catch(e){}};
+  restore();requestAnimationFrame(restore);
+}
 function render(){
   const fn={overview:rOverview,close:rClose,productions:rProductions,clients:rClients,team:rTeam,payroll:rPayroll,invoices:rInvoices,subs:rSubs,pipeline:rPipeline,products:rProducts,smart:rSmart,tools:rTools,users:rUsers}[CUR];
-  if(fn)fn();window.scrollTo(0,0);
+  if(!fn)return;
+  const changed=LASTCUR!==CUR;LASTCUR=CUR;
+  if(changed){fn();window.scrollTo(0,0);}else keepScroll(fn);
 }
 function card(l,v,cls=''){return `<div class="card ${cls}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`;}
 function modal(html){$('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;}
@@ -2380,7 +2391,7 @@ async function newProdn(){
 async function delProdn(id){if(!confirm('למחוק את ההפקה?'))return;if(await del('productions',id))rProductions();}
 function prodn(id){return DB.productions.find(x=>x.id===id);}
 let PRODV=null;
-function openProdn(id){PRODV=id;PRODF=PRODF0();PRODTAB='status';renderProd();prodRefresh(id,true);}
+function openProdn(id){PRODV=id;PRODF=PRODF0();PRODTAB='status';renderProd();window.scrollTo(0,0);prodRefresh(id,true);}
 /* v8.1: רענון ההפקה מהשרת — כדי לא לעבוד על עותק ישן (שינויים ממחשב אחר / תיקונים ישירים בבסיס הנתונים) */
 async function prodRefresh(id,silent){
   try{const {data,error}=await sb.from('productions').select('*').eq('id',id).single();if(error||!data)return;
@@ -2394,7 +2405,8 @@ function pfSet(k,v){PRODF[k]=v;renderProd();}
 function prodBack(){PRODV=null;rProductions();}
 const PRODF0=()=>({q:'',cat:'',inv:'',pay:'',min:'',max:'',line:'',sup:'',payer:''});
 let PRODTAB='status',PRODF=PRODF0();
-function renderProd(){
+function renderProd(){keepScroll(renderProd0);}
+function renderProd0(){
   const p=prodn(PRODV);if(!p){rProductions();return;}
   if((p.lines||[]).some(l=>!l.id)){prodEnsureIds(p).then(()=>renderProd());return;}
   const ed=canEdit();const k=prodCalc(p);const dis=ed?'':'disabled';const sym=CURR[p.currency]||'₪';
