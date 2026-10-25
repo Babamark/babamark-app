@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.1</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.2</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -1161,6 +1161,7 @@ async function ezCreate(id){
     }
     closeModal();toast((isPro?'חשבון עסקה ':'חשבונית ')+(data.doc_number||'')+' הופק/ה ✓');
     if(data.pdf_link){const w=window.open(data.pdf_link,'_blank');if(!w)toast('ה-PDF נחסם — פתח מהקישור בהזמנת הרכש / בגבייה');}
+    if(EZOPT?.prod&&!isPro){const pp=prodn(EZOPT.prod.id);if(pp)await upd('productions',pp.id,{bill_status:'חשבונית הופקה'});EZOPT=null;renderProd();return;}
     if(EZOPT?.po){EZOPT=null;renderProd();}else render();
   }catch(e){
     $('ezErr').textContent=e.message.includes('Failed to send')?'הפונקציה ezcount לא מותקנת עדיין ב-Supabase — עקוב אחרי ההוראות':e.message;
@@ -2556,6 +2557,7 @@ function renderProd(){
     <span class="pill gr" style="font-size:12px" title="כל המספרים בהפקה — תחזית, PO, הוצאות, רווח — לפני מע״מ. מע״מ מתווסף רק בחשבונית ובשורות 'כולל מע״מ'">כל הסכומים לפני מע״מ · מע״מ ${Math.round(k.vrate*100)}% מתווסף בחשבונית</span>
     <select class="pill ${stCls}" style="border:none;cursor:pointer;font-size:12.5px;padding:6px 14px" ${dis} onchange="pdSet(${p.id},'bill_status',this.value,true)">
       ${['טרם חויב','חשבונית הופקה','שולם'].map(x=>`<option ${st===x?'selected':''}>${x}</option>`).join('')}</select>
+    ${ed&&st==='טרם חויב'&&!(p.pos||[]).length&&k.billing>0?`<button class="btn green" style="padding:6px 14px;font-size:12.5px" title="חשבונית מס על מה שהלקוח משלם (${NIS(k.billing)} לפני מע״מ) — נכנסת לכרטיס החודש של הלקוח" onclick="prodBillNow(${p.id})">⚡ חייב ${NIS(k.billing)} ₪</button>`:''}
   </div>
   ${showProfit()?(()=>{const S=prodStatus(p);const now=k.billing-k.actual;const proj=k.billing-S.projected;const noPo=k.noPoSum||0;
     return `<div class="panel" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;border:2px solid ${proj<0?'var(--red)':'var(--green)'}">
@@ -3653,6 +3655,19 @@ async function poInvoice(pid,i,kind,pct,amtOverride,docType){
     e=await ins('entries',{month_label:m,client_name:p.client_name,retainer:0,shooting:0,design:0,status:'no',paid_amt:0,note:'',work_type:c?.pkg||'',vat:c?.vat!=null?+c.vat:null,currency:'ILS',ils_rate:1,team:[],addons:[],work_lines:[],updated_by:ME?.email||''});if(!e)return;}
   const desc=kindTxt+' · PO '+o.number+' · '+p.name;
   ezModal(e.id,{docType:docType||305,po:{prod_id:pid,idx:i,kind,pct,amount:amt,number:o.number,kindTxt,addon_desc:desc,label:p.name+(o.desc?' — '+o.desc:'')+' · '+kindTxt}});
+}
+/* v8.2 — חיוב הפקה בלי PO: הסכום שהלקוח משלם נכנס ככרטיס-חודש של הלקוח ויוצאת עליו חשבונית מס */
+async function prodBillNow(pid){
+  const p=prodn(pid);if(!p)return;if(!p.client_name){toast('בחר לקוח להפקה קודם');return;}
+  const k=prodCalc(p);const amt=Math.round(+k.billing||0);if(amt<=0){toast('אין מה לחייב');return;}
+  const m=CURMONTH||p.month_label;if(!m){toast('בחר חודש למעלה');return;}
+  let e=DB.entries.find(x=>x.month_label===m&&x.client_name===p.client_name);
+  if(!e){const c=DB.clients.find(x=>x.name===p.client_name);
+    e=await ins('entries',{month_label:m,client_name:p.client_name,retainer:0,shooting:0,design:0,status:'no',paid_amt:0,note:'',work_type:c?.pkg||'',vat:c?.vat!=null?+c.vat:null,currency:'ILS',ils_rate:1,team:[],addons:[],work_lines:[],updated_by:ME?.email||''});if(!e)return;}
+  const desc='הפקה · '+p.name;
+  const addons=structuredClone(e.addons||[]).filter(a=>a.desc!==desc);addons.push({desc,charge:amt,cost:0,prod_id:pid});
+  await upd('entries',e.id,{addons});
+  ezModal(e.id,{docType:305,prod:{id:pid}});
 }
 /* הזמנת רכש מקובץ: HTML של Ariba נקרא מקומית; PDF/תמונה — דרך receipt-ocr */
 async function poFromFile(pid,file){
