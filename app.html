@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.2</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.3</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -2448,6 +2448,7 @@ function renderProd0(){
       <h3 style="margin:0">יומן הוצאות בפועל · ${filtering?NIS(filtSum)+' '+(CURR[p.currency]||'₪')+' ('+acFilt.length+' מתוך '+acAll.length+')':fmtC(k.actual,p.currency)} <span class="mut" style="font-size:11px">${filtering?'':'('+NIS(k.actualInc)+' כולל מע״מ)'}</span></h3>
       <span class="row" style="gap:6px">
       ${filtering?`<button class="btn sm gray" onclick="PRODF=PRODF0();renderProd()">✕ נקה סינון${PRODF.line?' · '+esc(lineLabel(lineOf(p,PRODF.line)||{})):''}${PRODF.sup?' · ספק: '+esc(PRODF.sup==='__none'?'ללא ספק':PRODF.sup):''}${PRODF.payer?' · שילם/ה: '+esc(PRODF.payer):''}</button>`:''}
+      ${ed?`<button class="btn sm gray" onclick="supManage()" title="רשימת הספקים המרכזית">👥 ספקים</button>`:''}
       <button class="btn sm gray" onclick="PRODTAB='recon';renderProd()" title="סיכום לפי ספק ולפי מי שילם: מה שולם, מה פתוח, איפה חסרות חשבוניות">🧾 התחשבנות</button>
       ${can('export')?`<button class="btn sm gray" onclick="exportProdCsv(${p.id})">⬇ אקסל</button>`:''}
       ${ed?`<button class="btn sm gray" onclick="prodImportModal(${p.id},'actuals')">⬆ ייבוא מאקסל</button>`:''}
@@ -2476,7 +2477,7 @@ function renderProd0(){
       return `<tr${a.internal?' style="opacity:.6;background:#fbfbfd"':''}>
       <td><input type="checkbox" class="rcv_ck" data-i="${i}" title="${actReceipts(a).length?'סמן להורדה ב-ZIP':'אין קבלה מצורפת'}"></td>
       <td><input class="cell wide" style="width:120px" ${dis} value="${esc(a.desc)}" onchange="paSet(${p.id},${i},'desc',this.value)"></td>
-      <td><input class="cell wide" style="width:85px" ${dis} value="${esc(a.supplier||'')}" onchange="paSet(${p.id},${i},'supplier',this.value)"></td>
+      <td>${supSelect(p.id,i,a.supplier||'',dis)}</td>
       <td><input class="cell wide" style="width:95px" list="paCats${p.id}" ${dis} value="${esc(a.cat||'')}" placeholder="—" onchange="paSet(${p.id},${i},'cat',this.value.trim())"></td>
       <td>${lineSelect(p,(a.line_id||'')+(a.sub_id?'|'+a.sub_id:''),`paLink(${p.id},${i},this.value)`,dis)}</td>
       <td><input class="cell" ${dis} value="${(+a.amount||0).toFixed(0)}" onchange="paSet(${p.id},${i},'amount',this.value)"></td>
@@ -2997,7 +2998,7 @@ function quickExpense(id,lineId){
   <label>סעיף בתחזית</label>${lineSelect(p,lineId||'',"QE.line=this.value;const l=lineOf(prodn(QE.id),this.value);if(l){$('qeCat').value=l.cat||'';}",'id="qeLine"')}
   <div class="wl-row" style="grid-template-columns:2fr 1.2fr">
     <div><span class="wl-head">מה</span><input id="qeDesc" value="${esc(sub?sub.desc:(l?l.desc:''))}" placeholder="מה קנינו / למי שילמנו"></div>
-    <div><span class="wl-head">ספק</span><input id="qeSup" placeholder="שם הספק"></div>
+    <div><span class="wl-head">ספק</span><input id="qeSup" list="qeSupList" placeholder="שם הספק"><datalist id="qeSupList">${supList().map(x=>`<option value="${esc(x.name)}">`).join('')}</datalist></div>
   </div>
   <div class="wl-row" style="grid-template-columns:1fr 1fr 1fr 1fr">
     <div><span class="wl-head">סכום ${sym}</span><input id="qeAmt" dir="ltr" placeholder="0" value="${sub&&+sub.cost?+sub.cost:''}"></div>
@@ -3429,7 +3430,100 @@ async function paAdd(id){const p=prodn(id);
     const last=rows[rows.length-1];if(last){last.scrollIntoView({block:'center'});const inp=last.querySelector('input');inp&&inp.focus();}},60);}
 
 /* ---------- התחשבנות (v7.6): מי שילם מה · כמה מגיע לכל ספק · איפה חסרות חשבוניות ---------- */
-const supKey=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+/* ---------- v8.3 — רשימת ספקים מרכזית: [{name,kind,vat,aliases:[]}] ב-settings.suppliers_list ---------- */
+const SUPKINDS=['','פרילנסר','ספק חיצוני','פנימי'];
+const SUPVATS=['','עוסק פטור','עוסק מורשה','חברה'];
+function supList(){const l=sj('suppliers_list',[]);return Array.isArray(l)?l:[];}
+let _sa={raw:null,map:{}};
+function supAliasMap(){const raw=DB.settings.suppliers_list;if(_sa.raw===raw)return _sa.map;
+  const m={};supList().forEach(s=>{const c=String(s.name||'').trim().toLowerCase().replace(/\s+/g,' ');if(!c)return;m[c]=c;(s.aliases||[]).forEach(x=>{const k=String(x||'').trim().toLowerCase().replace(/\s+/g,' ');if(k&&!m[k])m[k]=c;});});
+  _sa={raw,map:m};return m;}
+const supKey=s=>{const k=String(s||'').trim().toLowerCase().replace(/\s+/g,' ');if(!k)return k;return supAliasMap()[k]||k;};
+function supByName(n){const k=supKey(n);if(!k)return null;return supList().find(s=>supKey(s.name)===k)||null;}
+function supUsage(){const u={};DB.productions.forEach(p=>(p.actuals||[]).forEach(a=>{const k=supKey(a.supplier);if(!k)return;u[k]=(u[k]||0)+1;}));return u;}
+function supSelect(pid,i,cur,dis=''){
+  const L=supList().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'he'));
+  const hit=cur?supByName(cur):null;const legacy=cur&&!hit;
+  return `<select class="cell wide" ${dis} style="width:110px;${cur?'':'color:var(--amber)'}" onchange="supPick(${pid},${i},this.value)">
+    <option value="" ${cur?'':'selected'}>טרם נקבע</option>
+    ${L.map(s=>`<option value="${esc(s.name)}" ${hit&&hit.name===s.name?'selected':''}>${esc(s.name)}</option>`).join('')}
+    ${legacy?`<option value="${esc(cur)}" selected>⚠ ${esc(cur)}</option>`:''}
+    <option value="__new">＋ ספק חדש…</option></select>`;}
+async function supPick(pid,i,v){if(v==='__new'){supNewModal(pid,i);return;}await paSet(pid,i,'supplier',v);}
+function supNewModal(pid,i,pre){
+  modal(`<h3>ספק חדש</h3>
+  <div class="row" style="flex-wrap:wrap;gap:10px;margin:10px 0">
+    <div><span class="wl-head">שם</span><input id="snName" value="${esc(pre||'')}" placeholder="שם הספק"></div>
+    <div><span class="wl-head">סוג</span><select id="snKind">${SUPKINDS.map(x=>`<option>${x}</option>`).join('')}</select></div>
+    <div><span class="wl-head">סטטוס מס</span><select id="snVat">${SUPVATS.map(x=>`<option>${x}</option>`).join('')}</select></div>
+  </div>
+  <div class="row" style="gap:8px"><button class="btn" onclick="supNewSave(${pid==null?'null':pid},${i==null?'null':i})">שמור${pid!=null?' והצמד לשורה':''}</button><button class="btn gray" onclick="closeModal();${pid!=null?'renderProd()':''}">ביטול</button></div>`);
+  setTimeout(()=>{const e=$('snName');if(e)e.focus();},50);}
+async function supNewSave(pid,i){
+  const name=$('snName').value.trim();if(!name){toast('חסר שם');return;}
+  const L=supList();let s=supByName(name);
+  if(!s){s={name,kind:$('snKind').value,vat:$('snVat').value,aliases:[]};L.push(s);if(!await setSetting('suppliers_list',L))return;}
+  closeModal();
+  if(pid!=null)await paSet(pid,i,'supplier',s.name);else supManage();}
+function supManage(){
+  const L=supList(),U=supUsage();
+  modal(`<h3>👥 ספקים · ${L.length}</h3>
+  <div class="mut" style="font-size:12px;margin-bottom:8px">רשימה אחת לכל ההפקות. שינוי שם שומר את השם הישן ככינוי, כך שהשורות הקיימות ממשיכות להתקבץ. אפשר להוסיף כינויים ידנית (מופרדים בפסיק) כדי לאחד שני שמות.</div>
+  <div style="max-height:55vh;overflow:auto"><table class="tbl"><thead><tr><th>שם</th><th>סוג</th><th>מס</th><th>כינויים</th><th>שורות</th><th></th></tr></thead><tbody>
+  ${L.map((s,j)=>`<tr>
+    <td><input class="cell wide" style="width:140px" value="${esc(s.name)}" onchange="supEdit(${j},'name',this.value)"></td>
+    <td><select class="cell" onchange="supEdit(${j},'kind',this.value)">${SUPKINDS.map(x=>`<option ${x===(s.kind||'')?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td><select class="cell" onchange="supEdit(${j},'vat',this.value)">${SUPVATS.map(x=>`<option ${x===(s.vat||'')?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td><input class="cell wide" style="width:150px" value="${esc((s.aliases||[]).join(', '))}" onchange="supEdit(${j},'aliases',this.value)"></td>
+    <td class="num">${U[supKey(s.name)]||0}</td>
+    <td><button class="btn sm gray" title="מסיר מהרשימה בלבד, שורות קיימות לא משתנות" onclick="supDel(${j})">✕</button></td></tr>`).join('')||'<tr><td colspan="6" class="mut">הרשימה ריקה. לחץ "ייבא מהיומנים" כדי להתחיל מהשמות שכבר קיימים.</td></tr>'}
+  </tbody></table></div>
+  <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="supNewModal(null,null)">＋ ספק</button><button class="btn gray" onclick="supImportModal()">📥 ייבא מהיומנים</button><button class="btn gray" onclick="closeModal();renderProd()">סגור</button></div>`);}
+async function supEdit(j,f,v){const L=supList();const s=L[j];if(!s)return;
+  if(f==='name'){const nn=v.trim();if(!nn){supManage();return;}if(nn!==s.name){s.aliases=[...new Set([...(s.aliases||[]),s.name])];s.name=nn;}}
+  else if(f==='aliases')s.aliases=String(v).split(',').map(x=>x.trim()).filter(Boolean);
+  else s[f]=v;
+  await setSetting('suppliers_list',L);supManage();}
+async function supDel(j){const L=supList();if(!L[j])return;if(!confirm('להסיר את "'+L[j].name+'" מהרשימה? שורות קיימות לא ישתנו.'))return;L.splice(j,1);await setSetting('suppliers_list',L);supManage();}
+/* ייבוא: אוסף שמות ספקים חופשיים מכל היומנים ומציע איחוד של כתיבות דומות. שום דבר לא נשמר עד לחיצה על "ייבא". */
+function supNorm(s){return String(s||'').toLowerCase().replace(/בע["״']?מ/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');}
+function supLev(a,b){const m=a.length,n=b.length;if(Math.abs(m-n)>1)return 9;let p=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c;}return p[n];}
+let SUPIMP=[];
+function supClusters(){
+  const cnt={};DB.productions.forEach(p=>(p.actuals||[]).forEach(a=>{if(a.internal)return;const s=String(a.supplier||'').trim();if(!s||supByName(s))return;cnt[s]=(cnt[s]||0)+1;}));
+  const names=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);const cl=[];
+  names.forEach(n=>{const nn=supNorm(n);const hit=cl.find(c=>c.vars.some(v=>{const vv=supNorm(v);return vv===nn||(nn.length>=5&&vv.length>=5&&supLev(vv,nn)<=1);}));
+    if(hit)hit.vars.push(n);else cl.push({vars:[n]});});
+  return cl.map(c=>({vars:c.vars,name:c.vars[0],n:c.vars.reduce((a,v)=>a+cnt[v],0),on:true,unify:c.vars.length>1,kind:''}));}
+function supImportModal(){
+  SUPIMP=supClusters();
+  if(!SUPIMP.length){modal('<h3>ייבוא ספקים</h3><div class="mut">לא נמצאו שמות חדשים ביומנים. כל הספקים הקיימים כבר ברשימה.</div><div class="row" style="margin-top:12px"><button class="btn gray" onclick="supManage()">חזרה</button></div>');return;}
+  modal(`<h3>ייבוא ספקים מהיומנים · ${SUPIMP.length}</h3>
+  <div class="mut" style="font-size:12px;margin-bottom:8px">כתיבות דומות כבר מקובצות. בטל סימון למי שלא צריך ברשימה, תקן שם ראשי אם צריך. "אחד שורות" משנה את הספק בשורות הקיימות לשם הראשי. ביטול הסימון משאיר אותן כמו שהן.</div>
+  <div style="max-height:55vh;overflow:auto"><table class="tbl"><thead><tr><th></th><th>שם ראשי</th><th>כתיבות שנמצאו</th><th>שורות</th><th>סוג</th><th>אחד שורות</th></tr></thead><tbody>
+  ${SUPIMP.map((c,j)=>`<tr><td><input type="checkbox" ${c.on?'checked':''} onchange="SUPIMP[${j}].on=this.checked"></td>
+    <td><input class="cell wide" style="width:150px" value="${esc(c.name)}" onchange="SUPIMP[${j}].name=this.value.trim()"></td>
+    <td class="mut" style="font-size:12px">${c.vars.map(esc).join(' · ')}</td><td class="num">${c.n}</td>
+    <td><select class="cell" onchange="SUPIMP[${j}].kind=this.value">${SUPKINDS.map(x=>`<option>${x}</option>`).join('')}</select></td>
+    <td style="text-align:center">${c.vars.length>1?`<input type="checkbox" checked onchange="SUPIMP[${j}].unify=this.checked">`:'—'}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="row" style="gap:8px;margin-top:12px"><button class="btn" onclick="supImportApply()">ייבא</button><button class="btn gray" onclick="supManage()">ביטול</button></div>`);}
+async function supImportApply(){
+  const L=supList();const ren={};let added=0;
+  SUPIMP.filter(c=>c.on&&c.name).forEach(c=>{
+    const al=c.vars.filter(v=>v!==c.name);
+    let ex=supByName(c.name);
+    if(!ex){L.push({name:c.name,kind:c.kind,vat:'',aliases:al});added++;}else ex.aliases=[...new Set([...(ex.aliases||[]),...al])];
+    if(c.unify)c.vars.forEach(v=>{if(v!==c.name)ren[v]=c.name;});});
+  if(!await setSetting('suppliers_list',L))return;
+  let rows=0;
+  if(Object.keys(ren).length){for(const p of DB.productions){let ch=false;const a=structuredClone(p.actuals||[]);
+    a.forEach(r=>{const s=String(r.supplier||'').trim();if(ren[s]){r.supplier=ren[s];ch=true;rows++;}});
+    if(ch)await upd('productions',p.id,{actuals:a});}}
+  toast('נוספו '+added+' ספקים'+(rows?' · אוחדו '+rows+' שורות':''));
+  supManage();}
+
 function reconData(p,k){
   const ac=(p.actuals||[]);const S={},P={};let T={total:0,paid:0,priv:0,privOpen:0,open:0,missAmt:0,missN:0,noSup:0,noSupAmt:0,internal:0};
   ac.forEach((a,i)=>{
@@ -3472,6 +3566,7 @@ function prodReconSection(p,k,ed){
       <span class="row" style="gap:6px">
         ${can('export')?`<button class="btn sm gray" onclick="exportRecon(${p.id})">⬇ אקסל</button>
         <button class="btn sm" title="חבילה לרו״ח: ZIP של כל הקבלות והחשבוניות (מסמך מרוכז פעם אחת) + אקסל עם כל השורות, לפי ספק ומי שילם" onclick="accountantPack(${p.id})">📦 חבילה לרו״ח</button>`:''}
+        ${ed?`<button class="btn sm gray" onclick="supManage()">👥 ספקים</button>`:''}
         <button class="btn sm gray" onclick="PRODTAB='actuals';renderProd()">← ליומן</button>
         <button class="btn sm gray" title="טוען מחדש את ההפקה מהשרת" onclick="prodRefresh(${p.id})">⟳</button>
       </span>
