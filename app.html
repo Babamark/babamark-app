@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.3</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.3.1</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -2477,7 +2477,7 @@ function renderProd0(){
       return `<tr${a.internal?' style="opacity:.6;background:#fbfbfd"':''}>
       <td><input type="checkbox" class="rcv_ck" data-i="${i}" title="${actReceipts(a).length?'סמן להורדה ב-ZIP':'אין קבלה מצורפת'}"></td>
       <td><input class="cell wide" style="width:120px" ${dis} value="${esc(a.desc)}" onchange="paSet(${p.id},${i},'desc',this.value)"></td>
-      <td>${supSelect(p.id,i,a.supplier||'',dis)}</td>
+      <td style="white-space:nowrap">${supSelect(p.id,i,a.supplier||'',dis)}${ed?`<span style="cursor:pointer;font-size:14px;margin-right:4px;color:var(--sky)" title="פצל את ההוצאה לכמה ספקים" onclick="paSplit(${p.id},${i})">✂</span>`:''}</td>
       <td><input class="cell wide" style="width:95px" list="paCats${p.id}" ${dis} value="${esc(a.cat||'')}" placeholder="—" onchange="paSet(${p.id},${i},'cat',this.value.trim())"></td>
       <td>${lineSelect(p,(a.line_id||'')+(a.sub_id?'|'+a.sub_id:''),`paLink(${p.id},${i},this.value)`,dis)}</td>
       <td><input class="cell" ${dis} value="${(+a.amount||0).toFixed(0)}" onchange="paSet(${p.id},${i},'amount',this.value)"></td>
