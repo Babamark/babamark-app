@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.3.2</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.4</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -3437,10 +3437,7 @@ function paSplit(pid,i){const p=prodn(pid);const a=(p.actuals||[])[i];if(!a)retu
   const tot=+a.amount||0;if(tot<=0){toast('אין סכום לפצל');return;}
   SPL={pid,i,tot,rows:[{sup:a.supplier||'',amt:tot},{sup:'',amt:0}]};splRender();}
 function splRem(){const s=SPL.rows.slice(0,-1).reduce((x,r)=>x+(+r.amt||0),0);return Math.round((SPL.tot-s)*100)/100;}
-function splSelect(j,cur){
-  const L=supList().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'he'));const hit=cur?supByName(cur):null;const legacy=cur&&!hit;
-  return `<select class="cell wide" style="width:140px;${cur?'':'color:var(--amber)'}" onchange="splSup(${j},this.value)"><option value="">טרם נקבע</option>
-   ${L.map(s=>`<option value="${esc(s.name)}" ${hit&&hit.name===s.name?'selected':''}>${esc(s.name)}</option>`).join('')}${legacy?`<option value="${esc(cur)}" selected>⚠ ${esc(cur)}</option>`:''}<option value="__new">＋ ספק חדש…</option></select>`;}
+function splSelect(j,cur){return `<select class="cell wide" style="width:150px;${cur?'':'color:var(--amber)'}" onchange="splSup(${j},this.value)">${supOptions(SPL.pid,cur)}</select>`;}
 function splRender(){
   const p=prodn(SPL.pid),a=p.actuals[SPL.i],n=SPL.rows.length,rem=splRem(),bad=rem<-0.01;
   modal(`<h3>✂ פיצול הוצאה</h3>
@@ -3452,8 +3449,8 @@ function splRender(){
   </tbody></table>
   ${bad?'<div class="negv" style="font-size:12px;margin-top:6px">הסכומים עוברים את הסך. הקטן אחד מהם.</div>':''}
   <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" ${bad||rem<0.01?'disabled':''} onclick="splSave()">פצל</button><button class="btn gray" onclick="splAdd()">＋ חלק</button><button class="btn gray" onclick="closeModal();SPL=null">ביטול</button></div>`);}
-function splSup(j,v){if(v==='__new'){const nm=(prompt('שם הספק החדש')||'').trim();if(!nm){splRender();return;}
-    const L=supList();let s=supByName(nm);if(!s){s={name:nm,kind:'',vat:'',aliases:[]};L.push(s);setSetting('suppliers_list',L);}SPL.rows[j].sup=s.name;}
+function splSup(j,v){if(v==='__new'){const nm=(prompt('שם הספק (ספק הפקה נקודתי. להפיכה לקבוע: הטאב "רשימת ספקים")')||'').trim();if(!nm){splRender();return;}
+    const s=supByName(nm);SPL.rows[j].sup=s?s.name:nm;}
   else SPL.rows[j].sup=v;splRender();}
 function splAmt(j,v){SPL.rows[j].amt=Math.max(0,+String(v).replace(/[^\d.]/g,'')||0);splRender();}
 function splAdd(){SPL.rows.splice(SPL.rows.length-1,0,{sup:'',amt:0});splRender();}
@@ -3478,7 +3475,7 @@ function prodSupsSection(p,k,ed){
   const go=key=>`PRODF=Object.assign(PRODF0(),{sup:'${String(key).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}'});PRODTAB='actuals';renderProd()`;
   const inProj=new Set(sups.map(g=>g.key));
   const projRows=sups.map(g=>{const s=g.key==='__none'?null:supByName(g.name);const j=s?L.indexOf(s):-1;
-    const st=g.key==='__none'?'<span class="pill a">להשלים ספק</span>':(!s?`<span class="pill a">לא ברשימה</span>${ed?` <button class="btn sm gray" onclick="supNewModal('tab',null,'${esc(g.name).replace(/'/g,"\\'")}')">＋ הוסף</button>`:''}`:(g.open>0.5?`<span class="pill a">להעביר ${R(g.open)}</span>`:(g.miss?`<span class="pill" style="background:#fde8e8;color:#b42318">חסר מסמך ×${g.miss}</span>`:'<span class="pill" style="background:#e3f6e8;color:#1a7f37">✓ סגור</span>')));
+    const st=g.key==='__none'?'<span class="pill a">להשלים ספק</span>':(!s?`<span class="pill b">נקודתי</span>${ed?` <button class="btn sm gray" onclick="supNewModal('tab',null,'${esc(g.name).replace(/'/g,"\\'")}')">⭐ הפוך לקבוע</button>`:''}`:(g.open>0.5?`<span class="pill a">להעביר ${R(g.open)}</span>`:(g.miss?`<span class="pill" style="background:#fde8e8;color:#b42318">חסר מסמך ×${g.miss}</span>`:'<span class="pill" style="background:#e3f6e8;color:#1a7f37">✓ סגור</span>')));
     return `<tr><td><a style="cursor:pointer;color:var(--sky);font-weight:600" onclick="${go(g.key)}">${esc(g.name)}</a></td>
       <td class="mut" style="font-size:12px">${s?esc(s.kind||'—'):'—'}</td><td class="mut" style="font-size:12px">${s?esc(s.vat||'—'):'—'}</td>
       <td class="num">${g.n}</td><td class="num">${R(g.total)} ${sym}</td><td class="num">${g.open>0.5?R(g.open):'—'}</td><td class="num">${g.miss?g.miss:'—'}</td><td>${st}</td></tr>`;}).join('');
@@ -3515,30 +3512,40 @@ function supAliasMap(){const raw=DB.settings.suppliers_list;if(_sa.raw===raw)ret
 const supKey=s=>{const k=String(s||'').trim().toLowerCase().replace(/\s+/g,' ');if(!k)return k;return supAliasMap()[k]||k;};
 function supByName(n){const k=supKey(n);if(!k)return null;return supList().find(s=>supKey(s.name)===k)||null;}
 function supUsage(){const u={};DB.productions.forEach(p=>(p.actuals||[]).forEach(a=>{const k=supKey(a.supplier);if(!k)return;u[k]=(u[k]||0)+1;}));return u;}
+function prodSupNames(pid){const p=prodn(pid);const seen={},out=[];((p&&p.actuals)||[]).forEach(a=>{const s=String(a.supplier||'').trim();if(!s||supByName(s))return;const k=supKey(s);if(seen[k])return;seen[k]=1;out.push(s);});return out.sort((x,y)=>x.localeCompare(y,'he'));}
+function supOptions(pid,cur){
+  const L=supList().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'he'));const P=prodSupNames(pid);const hit=cur?supByName(cur):null;const ck=supKey(cur);
+  return `<option value="" ${cur?'':'selected'}>טרם נקבע</option>
+   ${P.length?`<optgroup label="ספקי ההפקה · נקודתיים">${P.map(n=>`<option value="${esc(n)}" ${supKey(n)===ck?'selected':''}>${esc(n)}</option>`).join('')}</optgroup>`:''}
+   ${L.length?`<optgroup label="ספקים קבועים · באבאמרק">${L.map(s=>`<option value="${esc(s.name)}" ${hit&&hit.name===s.name?'selected':''}>${esc(s.name)}</option>`).join('')}</optgroup>`:''}
+   <option value="__new">＋ ספק חדש…</option>`;}
 function supSelect(pid,i,cur,dis=''){
-  const L=supList().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'he'));
-  const hit=cur?supByName(cur):null;const legacy=cur&&!hit;
-  return `<select class="cell wide" ${dis} style="width:110px;${cur?'':'color:var(--amber)'}" onchange="supPick(${pid},${i},this.value)">
-    <option value="" ${cur?'':'selected'}>טרם נקבע</option>
-    ${L.map(s=>`<option value="${esc(s.name)}" ${hit&&hit.name===s.name?'selected':''}>${esc(s.name)}</option>`).join('')}
-    ${legacy?`<option value="${esc(cur)}" selected>⚠ ${esc(cur)}</option>`:''}
-    <option value="__new">＋ ספק חדש…</option></select>`;}
+  return `<select class="cell wide" ${dis} style="width:118px;${cur?'':'color:var(--amber)'}" onchange="supPick(${pid},${i},this.value)">${supOptions(pid,cur)}</select>`;}
 async function supPick(pid,i,v){if(v==='__new'){supNewModal(pid,i);return;}await paSet(pid,i,'supplier',v);}
 function supNewModal(pid,i,pre){
+  const row=typeof pid==='number';
   modal(`<h3>ספק חדש</h3>
   <div class="row" style="flex-wrap:wrap;gap:10px;margin:10px 0">
     <div><span class="wl-head">שם</span><input id="snName" value="${esc(pre||'')}" placeholder="שם הספק"></div>
+    <div><span class="wl-head">סוג ספק</span><select id="snScope" onchange="document.getElementById('snExtra').style.display=this.value==='perm'?'flex':'none'">
+      ${row?'<option value="once">ספק הפקה נקודתי (רק בהפקה הזאת)</option>':''}<option value="perm" ${row?'':'selected'}>ספק קבוע של באבאמרק</option></select></div>
+  </div>
+  <div id="snExtra" class="row" style="flex-wrap:wrap;gap:10px;margin-bottom:10px;display:${row?'none':'flex'}">
     <div><span class="wl-head">סוג</span><select id="snKind">${SUPKINDS.map(x=>`<option>${x}</option>`).join('')}</select></div>
     <div><span class="wl-head">סטטוס מס</span><select id="snVat">${SUPVATS.map(x=>`<option>${x}</option>`).join('')}</select></div>
   </div>
-  <div class="row" style="gap:8px"><button class="btn" onclick="supNewSave(${pid==null?'null':(typeof pid==='string'?"'"+pid+"'":pid)},${i==null?'null':i})">שמור${typeof pid==='number'?' והצמד לשורה':''}</button><button class="btn gray" onclick="closeModal();${pid==null?'supManage()':'renderProd()'}">ביטול</button></div>`);
+  ${row?'<div class="mut" style="font-size:12px;margin-bottom:8px">נקודתי: הספק מופיע רק בהפקה הזאת ולא נכנס לרשימה הקבועה. אפשר להפוך אותו לקבוע אחר כך מהטאב "רשימת ספקים".</div>':''}
+  <div class="row" style="gap:8px"><button class="btn" onclick="supNewSave(${pid==null?'null':(typeof pid==='string'?"'"+pid+"'":pid)},${i==null?'null':i})">שמור${row?' והצמד לשורה':''}</button><button class="btn gray" onclick="closeModal();${pid==null?'supManage()':'renderProd()'}">ביטול</button></div>`);
   setTimeout(()=>{const e=$('snName');if(e)e.focus();},50);}
 async function supNewSave(pid,i){
   const name=$('snName').value.trim();if(!name){toast('חסר שם');return;}
-  const L=supList();let s=supByName(name);
-  if(!s){s={name,kind:$('snKind').value,vat:$('snVat').value,aliases:[]};L.push(s);if(!await setSetting('suppliers_list',L))return;}
+  const scope=$('snScope').value;let use=name;
+  if(scope==='perm'){const L=supList();let s=supByName(name);
+    if(!s){s={name,kind:$('snKind').value,vat:$('snVat').value,aliases:[]};L.push(s);if(!await setSetting('suppliers_list',L))return;}
+    use=s.name;}
+  else{const s=supByName(name);if(s)use=s.name;}
   closeModal();
-  if(typeof pid==='number')await paSet(pid,i,'supplier',s.name);else if(pid==='tab')renderProd();else supManage();}
+  if(typeof pid==='number')await paSet(pid,i,'supplier',use);else if(pid==='tab')renderProd();else supManage();}
 function supManage(){
   const L=supList(),U=supUsage();
   modal(`<h3>👥 ספקים · ${L.length}</h3>
