@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.4</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.4.1</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -3470,13 +3470,21 @@ async function splSave(){
   if(await upd('productions',p.id,{actuals:a}))toast('הפיצול נשמר · '+parts.length+' שורות');renderProd();}
 
 /* ---------- v8.3 — טאב "רשימת ספקים" בהפקה ---------- */
+let SUPROWS=[];
+async function supRename(pid,idx,v){const old=SUPROWS[idx],nn=String(v||'').trim();if(!old||!nn||nn===old){renderProd();return;}
+  const sp=supByName(old);
+  if(sp){await supEdit(supList().indexOf(sp),'name',nn,'tab');return;}
+  const p=prodn(pid);const a=structuredClone(p.actuals||[]);const ok=supKey(old);let c=0;
+  a.forEach(r=>{if(supKey(r.supplier)===ok){r.supplier=nn;c++;}});
+  if(c&&await upd('productions',pid,{actuals:a}))toast('השם עודכן ב-'+c+' שורות');renderProd();}
 function prodSupsSection(p,k,ed){
+  SUPROWS=[];
   const {sups}=reconData(p,k);const L=supList();const U=supUsage();const sym=CURR[p.currency]||'₪';const R=n=>NIS(Math.round(n));
   const go=key=>`PRODF=Object.assign(PRODF0(),{sup:'${String(key).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}'});PRODTAB='actuals';renderProd()`;
   const inProj=new Set(sups.map(g=>g.key));
   const projRows=sups.map(g=>{const s=g.key==='__none'?null:supByName(g.name);const j=s?L.indexOf(s):-1;
     const st=g.key==='__none'?'<span class="pill a">להשלים ספק</span>':(!s?`<span class="pill b">נקודתי</span>${ed?` <button class="btn sm gray" onclick="supNewModal('tab',null,'${esc(g.name).replace(/'/g,"\\'")}')">⭐ הפוך לקבוע</button>`:''}`:(g.open>0.5?`<span class="pill a">להעביר ${R(g.open)}</span>`:(g.miss?`<span class="pill" style="background:#fde8e8;color:#b42318">חסר מסמך ×${g.miss}</span>`:'<span class="pill" style="background:#e3f6e8;color:#1a7f37">✓ סגור</span>')));
-    return `<tr><td><a style="cursor:pointer;color:var(--sky);font-weight:600" onclick="${go(g.key)}">${esc(g.name)}</a></td>
+    return `<tr><td style="white-space:nowrap">${g.key==='__none'?`<a style="cursor:pointer;color:var(--sky);font-weight:600" onclick="${go(g.key)}">${esc(g.name)}</a>`:`<input class="cell wide" style="width:150px" ${ed?'':'disabled'} value="${esc(g.name)}" title="עריכת שם הספק" onchange="supRename(${p.id},${SUPROWS.push(g.name)-1},this.value)"> <a style="cursor:pointer;color:var(--sky)" title="פתח את השורות שלו ביומן" onclick="${go(g.key)}">↗</a>`}</td>
       <td class="mut" style="font-size:12px">${s?esc(s.kind||'—'):'—'}</td><td class="mut" style="font-size:12px">${s?esc(s.vat||'—'):'—'}</td>
       <td class="num">${g.n}</td><td class="num">${R(g.total)} ${sym}</td><td class="num">${g.open>0.5?R(g.open):'—'}</td><td class="num">${g.miss?g.miss:'—'}</td><td>${st}</td></tr>`;}).join('');
   const rest=L.map((s,j)=>({s,j})).filter(({s})=>!inProj.has(supKey(s.name)));
