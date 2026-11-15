@@ -154,7 +154,7 @@ select.cell:hover{border-color:var(--line);background:#fff}
   <p style="margin-top:14px;opacity:.7;font-size:14px">טוען את המערכת…</p></div></div>
 <div id="app" class="hidden">
 <header>
-  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.4.1</span></div>
+  <div class="brand" style="flex-shrink:0;min-width:max-content"><span class="wordmark" style="display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline"><span class="w1">baba</span><span class="w2">mark</span></span><span class="brand-sub" style="font-size:11px;opacity:.65;margin-right:8px">ניהול סוכנות · v8.5</span></div>
   <div class="toolbar">
     <div style="position:relative">
       <button class="month" id="monthBtn" onclick="mpToggle(event)">—</button>
@@ -2449,6 +2449,7 @@ function renderProd0(){
       <span class="row" style="gap:6px">
       ${filtering?`<button class="btn sm gray" onclick="PRODF=PRODF0();renderProd()">✕ נקה סינון${PRODF.line?' · '+esc(lineLabel(lineOf(p,PRODF.line)||{})):''}${PRODF.sup?' · ספק: '+esc(PRODF.sup==='__none'?'ללא ספק':PRODF.sup):''}${PRODF.payer?' · שילם/ה: '+esc(PRODF.payer):''}</button>`:''}
       ${ed?`<button class="btn sm gray" onclick="supManage()" title="רשימת הספקים המרכזית">👥 ספקים</button>`:''}
+      ${ed?`<button class="btn sm gray" onclick="supFromDocsModal(${p.id})" title="משלים ספקים לפי השם שבחשבוניות המצורפות">🧾 ספקים מחשבוניות</button>`:''}
       <button class="btn sm gray" onclick="PRODTAB='recon';renderProd()" title="סיכום לפי ספק ולפי מי שילם: מה שולם, מה פתוח, איפה חסרות חשבוניות">🧾 התחשבנות</button>
       ${can('export')?`<button class="btn sm gray" onclick="exportProdCsv(${p.id})">⬇ אקסל</button>`:''}
       ${ed?`<button class="btn sm gray" onclick="prodImportModal(${p.id},'actuals')">⬆ ייבוא מאקסל</button>`:''}
@@ -2477,7 +2478,7 @@ function renderProd0(){
       return `<tr${a.internal?' style="opacity:.6;background:#fbfbfd"':''}>
       <td><input type="checkbox" class="rcv_ck" data-i="${i}" title="${actReceipts(a).length?'סמן להורדה ב-ZIP':'אין קבלה מצורפת'}"></td>
       <td><input class="cell wide" style="width:120px" ${dis} value="${esc(a.desc)}" onchange="paSet(${p.id},${i},'desc',this.value)"></td>
-      <td style="white-space:nowrap">${supSelect(p.id,i,a.supplier||'',dis)}${ed?`<button class="btn sm" style="padding:3px 7px;margin-right:2px;font-size:14px;line-height:1" title="פצל את ההוצאה לכמה ספקים" onclick="paSplit(${p.id},${i})">✂</button>`:''}</td>
+      <td style="white-space:nowrap">${supSelect(p.id,i,a.supplier||'',dis)}${ed?`<button class="btn sm" style="padding:3px 7px;margin-right:2px;font-size:14px;line-height:1" title="פצל את ההוצאה לכמה ספקים" onclick="paSplit(${p.id},${i})">✂</button>${actReceipts(a).length?`<button class="btn sm gray" style="padding:3px 6px;margin-right:2px;font-size:13px;line-height:1" title="שלוף את שם הספק מהחשבונית" onclick="supFromDoc(${p.id},${i})">🧾</button>`:''}`:''}</td>
       <td><input class="cell wide" style="width:95px" list="paCats${p.id}" ${dis} value="${esc(a.cat||'')}" placeholder="—" onchange="paSet(${p.id},${i},'cat',this.value.trim())"></td>
       <td>${lineSelect(p,(a.line_id||'')+(a.sub_id?'|'+a.sub_id:''),`paLink(${p.id},${i},this.value)`,dis)}</td>
       <td><input class="cell" ${dis} value="${(+a.amount||0).toFixed(0)}" onchange="paSet(${p.id},${i},'amount',this.value)"></td>
@@ -3469,6 +3470,51 @@ async function splSave(){
   closeModal();SPL=null;
   if(await upd('productions',p.id,{actuals:a}))toast('הפיצול נשמר · '+parts.length+' שורות');renderProd();}
 
+/* ---------- v8.5 — שליפת שם ספק מהחשבונית (שם שכבר זוהה בקבלה, ואם אין, קריאה בלחיצה דרך OCR) ---------- */
+function docSupNames(a){const c={},o=[];actReceipts(a).forEach(r=>{const s=String(r.supplier||'').trim();if(!s)return;const k=supKey(s);if(!c[k]){c[k]={name:s,n:0,rs:[]};o.push(c[k]);}c[k].n++;c[k].rs.push(r);});return o;}
+const supCanon=n=>{const s=supByName(n);return s?s.name:String(n||'').trim();};
+async function supFromDoc(pid,i){
+  const p=prodn(pid);const a0=(p.actuals||[])[i];if(!a0)return;
+  let names=docSupNames(a0);let arr=null;
+  if(!names.length){
+    const rs=actReceipts(a0).filter(r=>r.url);if(!rs.length){toast('אין חשבונית בשורה');return;}
+    toast('קורא את החשבונית…');arr=structuredClone(p.actuals);const R=receiptsNormalize(arr[i]);let got=false;
+    for(const r of R){if(!r.url||r.supplier)continue;
+      try{const resp=await fetch(r.url);if(!resp.ok)continue;const blob=await resp.blob();
+        const f=new File([blob],r.name||'doc.pdf',{type:blob.type||'application/pdf'});const d=await receiptOcr(p,f);
+        if(d&&d.supplier){r.supplier=String(d.supplier).trim();got=true;}}catch(e){console.warn(e);}}
+    if(!got){toast('לא הצלחתי לקרוא שם ספק מהחשבונית. אפשר להקליד ידנית');return;}
+    await upd('productions',pid,{actuals:arr});names=docSupNames(arr[i]);
+  }
+  const p2=prodn(pid);
+  if(names.length>1){
+    const o=p2.actuals[i];const k=prodCalc(p2);const tot=+o.amount||0;
+    const rows=names.map(g=>{const amt=g.rs.reduce((x,r)=>x+(r.amount!=null&&r.amount!==''?(r.vat===false||o.novat?+r.amount:(+r.amount/(1+k.vrate))):0),0);return{sup:supCanon(g.name),amt:Math.round(amt*100)/100};});
+    const pre=rows.slice(0,-1).reduce((x,r)=>x+r.amt,0);if(pre>=tot-0.01)rows.forEach(r=>r.amt=0);
+    SPL={pid,i,tot,rows};toast('בשורה יש חשבוניות של '+names.length+' ספקים. מוצע פיצול');splRender();return;}
+  const a=structuredClone(p2.actuals);const nm=supCanon(names[0].name);
+  if(a[i].supplier&&supKey(a[i].supplier)!==supKey(nm)&&!confirm('להחליף את הספק "'+a[i].supplier+'" ב"'+nm+'" לפי החשבונית?'))return;
+  a[i].supplier=nm;if(await upd('productions',pid,{actuals:a}))toast('הספק עודכן: '+nm);renderProd();}
+/* כל השורות בבת אחת: מציע שם ספק מהחשבוניות לשורות שחסר בהן ספק (או שונה). שום דבר לא משתנה עד לאישור */
+let DSUP=[];
+function supFromDocsModal(pid){
+  const p=prodn(pid);DSUP=[];let noName=0;
+  (p.actuals||[]).forEach((a,i)=>{if(a.internal)return;const g=docSupNames(a);
+    if(!g.length){if(actReceipts(a).some(r=>r.url)&&!supKey(a.supplier))noName++;return;}
+    if(g.length>1)return;const nm=supCanon(g[0].name);if(supKey(a.supplier)===supKey(nm))return;
+    DSUP.push({i,desc:a.desc||'',cur:a.supplier||'',nm,amt:+a.amount||0,on:!supKey(a.supplier)});});
+  if(!DSUP.length){modal(`<h3>🧾 ספקים מחשבוניות</h3><div class="mut">אין שורות שאפשר להשלים. ${noName?noName+' שורות עם חשבונית בלי שם ספק מזוהה: לחץ 🧾 בשורה כדי לקרוא אותה.':'כל השורות עם חשבונית כבר מתאימות.'}</div><div class="row" style="margin-top:12px"><button class="btn gray" onclick="closeModal()">סגור</button></div>`);return;}
+  modal(`<h3>🧾 ספקים מחשבוניות · ${DSUP.length}</h3>
+  <div class="mut" style="font-size:12px;margin-bottom:8px">השם נלקח מהחשבונית שמצורפת לשורה. מסומנות רק שורות בלי ספק. שורה עם ספק אחר ביומן לא מסומנת מראש. שורות עם חשבוניות של כמה ספקים לא מופיעות כאן: אפשר לפצל אותן בכפתור 🧾 בשורה.${noName?' עוד '+noName+' שורות עם חשבונית שלא זוהה בה שם (🧾 בשורה קורא אותן).':''}</div>
+  <div style="max-height:55vh;overflow:auto"><table class="tbl"><thead><tr><th></th><th>מה</th><th>ספק היום</th><th>לפי החשבונית</th><th>סכום</th></tr></thead><tbody>
+  ${DSUP.map((r,j)=>`<tr><td><input type="checkbox" ${r.on?'checked':''} onchange="DSUP[${j}].on=this.checked"></td><td>${esc(r.desc)}</td><td class="mut">${esc(r.cur)||'—'}</td><td><b>${esc(r.nm)}</b></td><td class="num">${NIS(r.amt)}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="row" style="gap:8px;margin-top:12px"><button class="btn" onclick="supFromDocsApply(${pid})">עדכן ספקים</button><button class="btn gray" onclick="closeModal()">ביטול</button></div>`);}
+async function supFromDocsApply(pid){
+  const p=prodn(pid);const a=structuredClone(p.actuals||[]);let c=0;
+  DSUP.filter(r=>r.on).forEach(r=>{if(a[r.i]){a[r.i].supplier=r.nm;c++;}});
+  closeModal();if(c&&await upd('productions',pid,{actuals:a}))toast('עודכנו '+c+' שורות');renderProd();}
+
 /* ---------- v8.3 — טאב "רשימת ספקים" בהפקה ---------- */
 let SUPROWS=[];
 async function supRename(pid,idx,v){const old=SUPROWS[idx],nn=String(v||'').trim();if(!old||!nn||nn===old){renderProd();return;}
@@ -3490,7 +3536,7 @@ function prodSupsSection(p,k,ed){
   const rest=L.map((s,j)=>({s,j})).filter(({s})=>!inProj.has(supKey(s.name)));
   return `<div class="panel">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">ספקי ההפקה · ${sups.filter(g=>g.key!=='__none').length}</h3>
-      <span class="row" style="gap:6px">${ed?`<button class="btn sm" onclick="supNewModal('tab',null)">＋ ספק</button><button class="btn sm gray" onclick="supImportModal()">📥 ייבא מהיומנים</button>`:''}<button class="btn sm gray" onclick="PRODTAB='actuals';renderProd()">← ליומן</button><button class="btn sm gray" onclick="PRODTAB='recon';renderProd()">🧾 התחשבנות</button></span></div>
+      <span class="row" style="gap:6px">${ed?`<button class="btn sm" onclick="supNewModal('tab',null)">＋ ספק</button><button class="btn sm gray" onclick="supFromDocsModal(${p.id})" title="משלים ספקים לפי השם שבחשבוניות המצורפות">🧾 ספקים מחשבוניות</button><button class="btn sm gray" onclick="supImportModal()">📥 ייבא מהיומנים</button>`:''}<button class="btn sm gray" onclick="PRODTAB='actuals';renderProd()">← ליומן</button><button class="btn sm gray" onclick="PRODTAB='recon';renderProd()">🧾 התחשבנות</button></span></div>
     <div class="mut" style="font-size:12px;margin:6px 0 8px">לחיצה על שם ספק פותחת את השורות שלו ביומן. שורות בלי ספק מופיעות כ"ללא ספק".</div>
     <div class="tblwrap"><table class="tbl"><thead><tr><th>ספק</th><th>סוג</th><th>מס</th><th>שורות</th><th>סה״כ כולל מע״מ</th><th>פתוח להעברה</th><th>בלי מסמך</th><th>מצב</th></tr></thead><tbody>${projRows||'<tr><td colspan="8" class="mut">עדיין אין הוצאות בהפקה.</td></tr>'}</tbody></table></div>
   </div>
